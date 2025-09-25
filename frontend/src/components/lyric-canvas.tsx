@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
+import { ChatDock } from "@/features/chat/components/chat-dock";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
 
@@ -330,6 +332,29 @@ export function LyricCanvas({
     [editor],
   );
 
+  const handleApplySuggestion = useCallback(
+    (content: string) => {
+      if (!editor) {
+        return;
+      }
+
+      editor.commands.setContent(content ?? "", false);
+      setDirty(true);
+      setState("idle");
+      setPreviewVersionId(null);
+      setPendingRestoreVersionId(null);
+      setMessage("Assistant suggestion applied. Save to capture the revision.");
+    },
+    [editor],
+  );
+
+  const getDocumentContent = useCallback(() => editor?.getHTML() ?? "", [editor]);
+
+  const getDocumentVersionId = useCallback(
+    () => currentVersionId,
+    [currentVersionId],
+  );
+
   const saveLabel = useMemo(() => {
     switch (state) {
       case "loading":
@@ -447,6 +472,12 @@ export function LyricCanvas({
           )}
         </div>
       </div>
+      <ChatDock
+        documentId={documentId}
+        getDocumentContent={getDocumentContent}
+        getDocumentVersionId={getDocumentVersionId}
+        onApplySuggestion={handleApplySuggestion}
+      />
     </section>
   );
 }

@@ -1,8 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .schemas import Document, DocumentRevertRequest, DocumentUpdate, DocumentVersion
-from .storage import DocumentStore
+from .routers import chat, documents
 
 app = FastAPI(title="Lyricist API")
 
@@ -14,66 +13,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-store = DocumentStore()
-
-
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
 
-
-@app.get("/documents/{document_id}", response_model=Document)
-async def read_document(document_id: str) -> Document:
-    try:
-        return store.load(document_id)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Document not found") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.put("/documents/{document_id}", response_model=Document)
-async def upsert_document(document_id: str, payload: DocumentUpdate) -> Document:
-    try:
-        return store.save(document_id, payload.content)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.get("/documents/{document_id}/versions", response_model=list[DocumentVersion])
-async def document_versions(document_id: str) -> list[DocumentVersion]:
-    try:
-        return store.list_versions(document_id)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Document not found") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.get(
-    "/documents/{document_id}/versions/{version_id}", response_model=DocumentVersion
-)
-async def document_version(document_id: str, version_id: str) -> DocumentVersion:
-    try:
-        return store.get_version(document_id, version_id)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Version not found") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.post("/documents/{document_id}/revert", response_model=Document)
-async def revert_document(
-    document_id: str, payload: DocumentRevertRequest
-) -> Document:
-    try:
-        return store.restore(document_id, payload.version_id)
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail="Version not found") from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@app.delete("/documents", status_code=204)
-async def clear_documents() -> None:
-    store.clear()
+app.include_router(documents.router)
+app.include_router(chat.router)
