@@ -90,6 +90,10 @@ a {
   align-items: stretch;
 }
 
+.canvas-layout > * {
+  min-height: 0;
+}
+
 .history-panel {
   background: rgba(11, 20, 30, 0.88);
   border: 1px solid rgba(88, 111, 143, 0.3);
@@ -224,6 +228,9 @@ a {
   flex-direction: column;
   gap: 1rem;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .chat-header h2 {
@@ -387,6 +394,37 @@ a {
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.chat-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.chat-option {
+  border: 1px solid rgba(88, 111, 143, 0.25);
+  border-radius: 0.9rem;
+  padding: 0.75rem 0.9rem;
+  background: rgba(20, 30, 42, 0.75);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.chat-option-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.chat-option-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .chat-composer form {

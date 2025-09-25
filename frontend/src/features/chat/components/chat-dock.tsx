@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
 
 import { useChatSession } from "@/features/chat/hooks/useChatSession";
-import type { ChatMessage, DiffChunk } from "@/features/chat/types";
+import type { ChatMessage, DiffChunk, LyricOption } from "@/features/chat/types";
 
 export type ChatDockProps = {
   documentId: string;
@@ -68,7 +68,7 @@ export function ChatDock({
             <ChatBubble
               key={message.id}
               message={message}
-              onApplySuggestion={onApplySuggestion}
+              onApplyOption={onApplySuggestion}
             />
           ))
         )}
@@ -106,18 +106,12 @@ export function ChatDock({
 
 function ChatBubble({
   message,
-  onApplySuggestion,
+  onApplyOption,
 }: {
   message: ChatMessage;
-  onApplySuggestion?: (content: string) => void;
+  onApplyOption?: (content: string) => void;
 }): JSX.Element {
   const isAssistant = message.role === "assistant";
-
-  const handleApply = useCallback(() => {
-    if (message.suggestedContent && onApplySuggestion) {
-      onApplySuggestion(message.suggestedContent);
-    }
-  }, [message.suggestedContent, onApplySuggestion]);
 
   return (
     <article
@@ -144,18 +138,8 @@ function ChatBubble({
       ) : message.content ? (
         <p className="chat-bubble-content">{message.content}</p>
       ) : null}
-      {isAssistant && message.diff && message.diff.length > 0 ? (
-        <DiffPreview diff={message.diff} />
-      ) : null}
-      {isAssistant && message.suggestedContent && onApplySuggestion ? (
-        <button
-          type="button"
-          className="chat-apply-button"
-          onClick={handleApply}
-          disabled={!message.suggestedContent}
-        >
-          Apply to Canvas
-        </button>
+      {isAssistant && message.options && message.options.length > 0 ? (
+        <OptionsList options={message.options} onApplyOption={onApplyOption} />
       ) : null}
     </article>
   );
@@ -191,5 +175,36 @@ function DiffPreview({ diff }: { diff: DiffChunk[] }): JSX.Element {
         </span>
       ))}
     </pre>
+  );
+}
+
+function OptionsList({
+  options,
+  onApplyOption,
+}: {
+  options: LyricOption[];
+  onApplyOption?: (lyrics: string) => void;
+}): JSX.Element {
+  return (
+    <div className="chat-options">
+      {options.map((option, index) => (
+        <div key={`option-${index}`} className="chat-option">
+          <div className="chat-option-head">
+            <span className="chat-option-label">{option.label}</span>
+            {onApplyOption ? (
+              <button
+                type="button"
+                className="chat-apply-button"
+                onClick={() => onApplyOption(option.lyrics)}
+                disabled={!option.lyrics}
+              >
+                Apply to Canvas
+              </button>
+            ) : null}
+          </div>
+          {option.diff && option.diff.length > 0 ? <DiffPreview diff={option.diff} /> : null}
+        </div>
+      ))}
+    </div>
   );
 }

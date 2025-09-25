@@ -27,5 +27,5 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser. The ho
 - The canvas stores data as HTML so future rich-text capabilities can build on the same contract.
 - Every save creates a new timestamped revision that appears in the history rail. Click a row to preview it, tap **Restore** to stage that revision, and press **Save** when you're ready to promote it.
 - Clear button (double-confirmed) wipes the archive if you want to reset during prototyping.
-- The GPT dock keeps lyrics and commentary separate so applying a suggestion never brings annotated prose into the editor.
+- The GPT dock keeps commentary separate from the proposed lyrics and surfaces multiple options when provided, each with its own diff and apply button.
 - Additional panels (metadata, exports) will plug into this layout as we expand the prototype.

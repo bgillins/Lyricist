@@ -7,6 +7,7 @@ import type {
   ChatRequestPayload,
   ChatResponsePayload,
   DiffChunk,
+  LyricOption,
 } from "@/features/chat/types";
 
 const API_BASE_URL =
@@ -107,9 +108,8 @@ export function useChatSession(options: UseChatSessionOptions): UseChatSessionRe
               ? {
                   ...msg,
                   content: data.commentary.join("\n"),
-                  diff: normalizeDiff(data.diff),
                   commentary: data.commentary,
-                  suggestedContent: data.lyrics,
+                  options: normalizeOptions(data.options),
                   status: "complete",
                   createdAt: Date.now(),
                 }
@@ -151,4 +151,15 @@ function normalizeDiff(chunks: DiffChunk[] | undefined): DiffChunk[] {
     return [];
   }
   return chunks.map((chunk) => ({ ...chunk, text: chunk.text ?? "" }));
+}
+
+function normalizeOptions(options: LyricOption[] | undefined): LyricOption[] {
+  if (!options) {
+    return [];
+  }
+  return options.map((option, index) => ({
+    label: option.label || `Option ${index + 1}`,
+    lyrics: option.lyrics || "",
+    diff: normalizeDiff(option.diff),
+  }));
 }

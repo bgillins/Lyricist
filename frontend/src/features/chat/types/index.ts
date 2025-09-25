@@ -3,13 +3,18 @@ export type DiffChunk = {
   text: string;
 };
 
+export type LyricOption = {
+  label: string;
+  lyrics: string;
+  diff: DiffChunk[];
+};
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  diff?: DiffChunk[];
   commentary?: string[];
-  suggestedContent?: string;
+  options?: LyricOption[];
   createdAt: number;
   status?: "pending" | "complete" | "error";
   error?: string;
@@ -28,6 +33,5 @@ export type ChatRequestPayload = {
 
 export type ChatResponsePayload = {
   commentary: string[];
-  lyrics: string;
-  diff: DiffChunk[];
+  options: LyricOption[];
 };

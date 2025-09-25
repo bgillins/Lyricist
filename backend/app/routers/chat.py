@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from ..models.prompt import PromptContext, PromptInput
-from ..schemas import ChatRequest, ChatResponse
+from ..schemas import ChatRequest, ChatResponse, LyricOption
 from ..services import diff
 from ..services.chat_service import generate_suggestion
 from ..services.text import strip_html
@@ -28,13 +28,20 @@ async def post_chat_message(document_id: str, payload: ChatRequest) -> ChatRespo
         context=context,
     )
 
-    commentary, html_lyrics = await generate_suggestion(prompt_input)
+    commentary, options = await generate_suggestion(prompt_input)
     original_text = strip_html(payload.document_content)
-    suggested_text = strip_html(html_lyrics)
-    diff_chunks = diff.diff_chunks(original_text, suggested_text)
 
-    return ChatResponse(
-        commentary=commentary,
-        lyrics=html_lyrics,
-        diff=diff_chunks,
-    )
+    response_options: list[LyricOption] = []
+    for option in options:
+        lyrics_html = option.get("lyrics_html", "")
+        lyrics_text = option.get("lyrics_text", strip_html(lyrics_html))
+        diff_chunks = diff.diff_chunks(original_text, lyrics_text)
+        response_options.append(
+            LyricOption(
+                label=option.get("label", "Option"),
+                lyrics=lyrics_html,
+                diff=diff_chunks,
+            )
+        )
+
+    return ChatResponse(commentary=commentary, options=response_options)
