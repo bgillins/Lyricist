@@ -1,0 +1,2 @@
+# Persisted documents are runtime artifacts
+*.json
