@@ -41,16 +41,17 @@ a {
   }
 }
 
+
 .app-body {
   min-height: 100vh;
-  padding: 2rem 0.75rem 2.5rem;
+  padding: 2rem 0 2.5rem;
   background: radial-gradient(circle at top, #1f2933, #0a1016 60%);
   display: flex;
   justify-content: center;
 }
 
 .app-shell {
-  width: min(960px, 100%);
+  width: min(1180px, 100%);
   display: flex;
   flex-direction: column;
   gap: 2rem;
@@ -339,7 +340,7 @@ a {
 
 @media (max-width: 720px) {
   .app-body {
-    padding: 1.25rem 0.75rem 2rem;
+    padding: 1.25rem 0.5rem 2rem;
   }
 
   .canvas-layout {
