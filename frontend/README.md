@@ -20,11 +20,12 @@ Start the dev server:
 npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) in your browser. The home page loads the lyric canvas, a revision feed, and a GPT collaborator dock. Click any timestamp in the history rail to preview that revision; hit **Restore** to stage it, and press **Save** to capture tweaks. Use the chat dock on the right to request changes—the assistant answers with GitHub-style diffs so you can review before applying.
+Then open [http://localhost:3000](http://localhost:3000) in your browser. The home page loads the lyric canvas, a revision feed, and a GPT collaborator dock. Click any timestamp in the history rail to preview that revision; hit **Restore** to stage it, and press **Save** to capture tweaks. Use the chat dock on the right to request changes—the assistant answers with commentary bullets plus a GitHub-style diff of the suggested lyrics so you can review before applying.
 
 ## Notes
 
 - The canvas stores data as HTML so future rich-text capabilities can build on the same contract.
 - Every save creates a new timestamped revision that appears in the history rail. Click a row to preview it, tap **Restore** to stage that revision, and press **Save** when you're ready to promote it.
 - Clear button (double-confirmed) wipes the archive if you want to reset during prototyping.
+- The GPT dock keeps lyrics and commentary separate so applying a suggestion never brings annotated prose into the editor.
 - Additional panels (metadata, exports) will plug into this layout as we expand the prototype.

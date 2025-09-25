@@ -55,13 +55,13 @@ export function ChatDock({
     <aside className="chat-panel" aria-label="Chat with assistant">
       <header className="chat-header">
         <h2>GPT Collaborator</h2>
-        <p>Describe what you need and we will diff the suggestion against your canvas.</p>
+        <p>Describe what you need; we return commentary plus a diff of the revised lyrics.</p>
       </header>
       <div className="chat-thread" role="log" aria-live="polite">
         {reversedMessages.length === 0 ? (
           <p className="chat-empty">
-            Ask for a revision, explain a section, or request alternatives. We will echo back
-            suggestions with GitHub-style highlights.
+            Ask for a revision, explain a section, or request alternatives. Each reply includes
+            commentary bullets and a GitHub-style diff so you can sanity-check before applying.
           </p>
         ) : (
           reversedMessages.map((message) => (
@@ -139,16 +139,46 @@ function ChatBubble({
       {message.status === "error" ? (
         <p className="chat-bubble-error-text">{message.error}</p>
       ) : null}
-      {message.content ? <p className="chat-bubble-content">{message.content}</p> : null}
+      {isAssistant && message.status !== "error" ? (
+        <CommentaryList message={message} />
+      ) : message.content ? (
+        <p className="chat-bubble-content">{message.content}</p>
+      ) : null}
       {isAssistant && message.diff && message.diff.length > 0 ? (
         <DiffPreview diff={message.diff} />
       ) : null}
       {isAssistant && message.suggestedContent && onApplySuggestion ? (
-        <button type="button" className="chat-apply-button" onClick={handleApply}>
+        <button
+          type="button"
+          className="chat-apply-button"
+          onClick={handleApply}
+          disabled={!message.suggestedContent}
+        >
           Apply to Canvas
         </button>
       ) : null}
     </article>
+  );
+}
+
+function CommentaryList({ message }: { message: ChatMessage }): JSX.Element | null {
+  const items = message.commentary?.length
+    ? message.commentary
+    : message.content
+        .split("\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+  if (!items || items.length === 0) {
+    return null;
+  }
+
+  return (
+    <ul className="chat-commentary">
+      {items.map((entry, index) => (
+        <li key={`${message.id}-commentary-${index}`}>{entry}</li>
+      ))}
+    </ul>
   );
 }
 

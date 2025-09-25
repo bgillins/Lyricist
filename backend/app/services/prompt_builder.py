@@ -3,9 +3,9 @@ from __future__ import annotations
 from .text import normalize_selection
 from ..models.prompt import PromptContext, PromptInput
 
-SYSTEM_PROMPT_TEMPLATE = """You are Lyricist, an assistant helping refine song lyrics.\n{metadata_block}\nRespond with clear suggestions and keep structure intact."""
+SYSTEM_PROMPT_TEMPLATE = """You are Lyricist, an assistant helping refine song lyrics.\n{metadata_block}\nRespond succinctly and follow the response format instructions."""
 
-USER_PROMPT_TEMPLATE = """Current lyrics:\n{content}\n{selection_block}\nUser request: {user_message}"""
+USER_PROMPT_TEMPLATE = """Current lyrics:\n{content}\n{selection_block}\nUser request: {user_message}\n\nStructure your answer as JSON with keys:\n- "commentary": array of short bullet strings describing the changes\n- "lyrics": the full revised lyrics as plain text (no commentary)"""
 
 
 def build_system_prompt(context: PromptContext) -> str:

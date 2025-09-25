@@ -8,6 +8,7 @@ export type ChatMessage = {
   role: "user" | "assistant" | "system";
   content: string;
   diff?: DiffChunk[];
+  commentary?: string[];
   suggestedContent?: string;
   createdAt: number;
   status?: "pending" | "complete" | "error";
@@ -26,7 +27,7 @@ export type ChatRequestPayload = {
 };
 
 export type ChatResponsePayload = {
-  message: string;
+  commentary: string[];
+  lyrics: string;
   diff: DiffChunk[];
-  suggested_content: string;
 };

@@ -54,11 +54,12 @@ class DiffChunk(BaseModel):
 
 
 class ChatResponse(BaseModel):
-    message: str
+    commentary: list[str] = Field(
+        default_factory=list,
+        description="Assistant notes explaining the suggested changes",
+    )
+    lyrics: str = Field(default="", description="Suggested lyric text only")
     diff: list[DiffChunk] = Field(
         default_factory=list,
         description="Git-style diff chunks comparing current content to assistant suggestion",
-    )
-    suggested_content: str = Field(
-        default="", description="Assistant's full suggested document content"
     )

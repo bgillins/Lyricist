@@ -37,6 +37,7 @@ This exposes the service on `http://127.0.0.1:8000`. Key routes:
 - `GET /documents/{id}/versions/{version_id}` — fetch the full contents of a specific revision.
 - `POST /documents/{id}/revert` — restore a revision (creates a new head version with that content).
 - `POST /chat/{id}` — (prototype) generate a suggestion and diff against the current canvas content.
+- Chat responses return structured JSON: commentary bullet points plus revised lyrics (no prose mixed in), ensuring the frontend can diff lyrics cleanly before applying them.
 - `DELETE /documents` — clear all stored documents and versions (destructive).
 
 Documents are stored as JSON under `data/documents/`. Each save writes a timestamped

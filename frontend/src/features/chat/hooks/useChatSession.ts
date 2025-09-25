@@ -106,9 +106,10 @@ export function useChatSession(options: UseChatSessionOptions): UseChatSessionRe
             msg.id === pendingAssistant.id
               ? {
                   ...msg,
-                  content: data.message,
+                  content: data.commentary.join("\n"),
                   diff: normalizeDiff(data.diff),
-                  suggestedContent: data.suggested_content,
+                  commentary: data.commentary,
+                  suggestedContent: data.lyrics,
                   status: "complete",
                   createdAt: Date.now(),
                 }

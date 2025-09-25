@@ -302,6 +302,21 @@ a {
   color: rgba(255, 255, 255, 0.88);
 }
 
+.chat-commentary {
+  margin: 0;
+  padding-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.chat-commentary li::marker {
+  color: rgba(255, 255, 255, 0.45);
+}
+
 .chat-bubble-error-text {
   font-size: 0.85rem;
   color: #ffb3b3;
@@ -319,11 +334,16 @@ a {
 
 .diff-chunk {
   display: inline;
+  white-space: pre-wrap;
 }
 
 .diff-insert {
   color: #16c784;
   background: rgba(22, 199, 132, 0.12);
+}
+
+.diff-insert::before {
+  content: "+ ";
 }
 
 .diff-delete {
@@ -332,8 +352,16 @@ a {
   text-decoration: line-through;
 }
 
+.diff-delete::before {
+  content: "- ";
+}
+
 .diff-equal {
   color: rgba(255, 255, 255, 0.78);
+}
+
+.diff-equal::before {
+  content: "  ";
 }
 
 .chat-apply-button {
@@ -352,6 +380,13 @@ a {
 
 .chat-apply-button:hover {
   transform: translateY(-1px);
+}
+
+.chat-apply-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .chat-composer form {

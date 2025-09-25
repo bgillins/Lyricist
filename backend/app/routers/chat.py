@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from ..config import settings
 from ..models.prompt import PromptContext, PromptInput
 from ..schemas import ChatRequest, ChatResponse
-from ..services import diff, prompt_builder
+from ..services import diff
+from ..services.chat_service import generate_suggestion
+from ..services.text import strip_html
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -27,22 +28,13 @@ async def post_chat_message(document_id: str, payload: ChatRequest) -> ChatRespo
         context=context,
     )
 
-    _ = prompt_builder.build_system_prompt(context)
-    _ = prompt_builder.build_user_prompt(prompt_input)
+    commentary, html_lyrics = await generate_suggestion(prompt_input)
+    original_text = strip_html(payload.document_content)
+    suggested_text = strip_html(html_lyrics)
+    diff_chunks = diff.diff_chunks(original_text, suggested_text)
 
-    # TODO: Wire in OpenAI client when credentials are present.
-    suggestion = _generate_stub_suggestion(payload.document_content, payload.message)
-    diff_chunks = diff.diff_chunks(payload.document_content, suggestion)
-
-    return ChatResponse(message=suggestion, diff=diff_chunks, suggested_content=suggestion)
-
-
-def _generate_stub_suggestion(current_html: str, message: str) -> str:
-    suffix = (
-        f"<p><em>Assistant note:</em> {message.strip()}</p>"
-        if message.strip()
-        else "<p><em>Assistant note:</em> Consider refining this section.</p>"
+    return ChatResponse(
+        commentary=commentary,
+        lyrics=html_lyrics,
+        diff=diff_chunks,
     )
-    if suffix in current_html:
-        return current_html
-    return current_html + suffix
