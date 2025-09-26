@@ -11,7 +11,7 @@ export type ChatDockProps = {
   getDocumentVersionId: () => string | null;
   getSelection?: () => string | null;
   metadata?: Record<string, string> | null;
-  onApplySuggestion?: (content: string) => void;
+  onPreviewOption?: (content: string) => void;
 };
 
 export function ChatDock({
@@ -20,7 +20,7 @@ export function ChatDock({
   getDocumentVersionId,
   getSelection,
   metadata,
-  onApplySuggestion,
+  onPreviewOption,
 }: ChatDockProps): JSX.Element {
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -68,7 +68,7 @@ export function ChatDock({
             <ChatBubble
               key={message.id}
               message={message}
-              onApplyOption={onApplySuggestion}
+              onPreviewOption={onPreviewOption}
             />
           ))
         )}
@@ -106,10 +106,10 @@ export function ChatDock({
 
 function ChatBubble({
   message,
-  onApplyOption,
+  onPreviewOption,
 }: {
   message: ChatMessage;
-  onApplyOption?: (content: string) => void;
+  onPreviewOption?: (content: string) => void;
 }): JSX.Element {
   const isAssistant = message.role === "assistant";
 
@@ -139,7 +139,7 @@ function ChatBubble({
         <p className="chat-bubble-content">{message.content}</p>
       ) : null}
       {isAssistant && message.options && message.options.length > 0 ? (
-        <OptionsList options={message.options} onApplyOption={onApplyOption} />
+        <OptionsList options={message.options} onPreviewOption={onPreviewOption} />
       ) : null}
     </article>
   );
@@ -180,10 +180,10 @@ function DiffPreview({ diff }: { diff: DiffChunk[] }): JSX.Element {
 
 function OptionsList({
   options,
-  onApplyOption,
+  onPreviewOption,
 }: {
   options: LyricOption[];
-  onApplyOption?: (lyrics: string) => void;
+  onPreviewOption?: (lyrics: string) => void;
 }): JSX.Element {
   return (
     <div className="chat-options">
@@ -191,14 +191,14 @@ function OptionsList({
         <div key={`option-${index}`} className="chat-option">
           <div className="chat-option-head">
             <span className="chat-option-label">{option.label}</span>
-            {onApplyOption ? (
+            {onPreviewOption ? (
               <button
                 type="button"
                 className="chat-apply-button"
-                onClick={() => onApplyOption(option.lyrics)}
+                onClick={() => onPreviewOption(option.lyrics)}
                 disabled={!option.lyrics}
               >
-                Apply to Canvas
+                Preview in Canvas
               </button>
             ) : null}
           </div>

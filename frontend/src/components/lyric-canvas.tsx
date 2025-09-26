@@ -27,6 +27,134 @@ type SaveState = "loading" | "idle" | "saving" | "saved" | "error";
 type HistoryState = "idle" | "loading" | "error";
 
 const HISTORY_SNIPPET_LENGTH = 120;
+const SECTION_HEADING_REGEX = /^[A-Z][A-Za-z0-9 '&()-]+:?$/;
+const SECTION_HEADING_WITH_BODY_REGEX =
+  /^([A-Z][A-Za-z0-9 '&()-]*(?:\s+\d+)?)\s*:\s+/;
+
+type SectionBlock = {
+  heading: string | null;
+  paragraphs: string[];
+};
+
+function parseSections(html: string): SectionBlock[] {
+  if (typeof document === "undefined") {
+    return [{ heading: null, paragraphs: [html] }];
+  }
+
+  const container = document.createElement("div");
+  container.innerHTML = html;
+  const paragraphs = Array.from(container.querySelectorAll("p"));
+
+  const sections: SectionBlock[] = [];
+  let current: SectionBlock | null = null;
+
+  paragraphs.forEach((paragraph) => {
+    const text = (paragraph.textContent ?? "").trim();
+    const markup = `<p>${paragraph.innerHTML}</p>`;
+
+    const isStandaloneHeading =
+      SECTION_HEADING_REGEX.test(text) && text.split(" ").length <= 8;
+    const headingMatch = text.match(SECTION_HEADING_WITH_BODY_REGEX);
+
+    if (isStandaloneHeading) {
+      if (current) {
+        sections.push(current);
+      }
+      current = {
+        heading: text.replace(/:$/, "").trim(),
+        paragraphs: [markup],
+      };
+      return;
+    }
+
+    if (headingMatch) {
+      if (current) {
+        sections.push(current);
+      }
+      current = { heading: headingMatch[1].trim(), paragraphs: [markup] };
+      return;
+    }
+
+    if (!current) {
+      current = { heading: null, paragraphs: [] };
+    }
+
+    current.paragraphs.push(markup);
+  });
+
+  if (current) {
+    sections.push(current);
+  }
+
+  return sections;
+}
+
+function mergeLyricsIntoDocument(currentHtml: string, optionHtml: string): string {
+  if (typeof document === "undefined") {
+    return optionHtml;
+  }
+
+  const normalizeParagraphs = (paragraphs: string[]) =>
+    paragraphs.join("").replace(/\s+/g, " ").trim();
+
+  const originalSections = parseSections(currentHtml);
+  const originalByHeading = new Map<string, SectionBlock>();
+  originalSections.forEach((section) => {
+    if (section.heading) {
+      originalByHeading.set(section.heading.toLowerCase(), section);
+    }
+  });
+
+  const optionSections = parseSections(optionHtml);
+  const replacements = new Map<string, SectionBlock>();
+
+  optionSections.forEach((section) => {
+    if (section.heading) {
+      const key = section.heading.toLowerCase();
+      const original = originalByHeading.get(key);
+      if (!original) {
+        replacements.set(key, section);
+        return;
+      }
+
+      if (
+        normalizeParagraphs(original.paragraphs) !==
+        normalizeParagraphs(section.paragraphs)
+      ) {
+        replacements.set(key, section);
+      }
+    }
+  });
+
+  if (replacements.size === 0) {
+    return currentHtml;
+  }
+
+  const used = new Set<string>();
+
+  const mergedSections = originalSections.map((section) => {
+    if (section.heading) {
+      const key = section.heading.toLowerCase();
+      if (replacements.has(key)) {
+        used.add(key);
+        const replacement = replacements.get(key)!;
+        return {
+          heading: replacement.heading,
+          paragraphs: replacement.paragraphs,
+        };
+      }
+    }
+    return section;
+  });
+
+  replacements.forEach((section, key) => {
+    if (!used.has(key)) {
+      mergedSections.push(section);
+    }
+  });
+
+  return mergedSections.flatMap((section) => section.paragraphs).join("");
+}
 
 function formatTimestamp(iso: string): string {
   const date = new Date(iso);
@@ -332,18 +460,19 @@ export function LyricCanvas({
     [editor],
   );
 
-  const handleApplySuggestion = useCallback(
-    (content: string) => {
+  const handlePreviewOption = useCallback(
+    (optionHtml: string) => {
       if (!editor) {
         return;
       }
 
-      editor.commands.setContent(content ?? "", false);
+      const merged = mergeLyricsIntoDocument(editor.getHTML(), optionHtml);
+      editor.commands.setContent(merged ?? optionHtml ?? "", false);
       setDirty(true);
       setState("idle");
       setPreviewVersionId(null);
       setPendingRestoreVersionId(null);
-      setMessage("Assistant suggestion applied. Save to capture the revision.");
+      setMessage("Preview loaded. Save to capture the revision or undo to discard.");
     },
     [editor],
   );
@@ -476,7 +605,7 @@ export function LyricCanvas({
         documentId={documentId}
         getDocumentContent={getDocumentContent}
         getDocumentVersionId={getDocumentVersionId}
-        onApplySuggestion={handleApplySuggestion}
+        onPreviewOption={handlePreviewOption}
       />
     </section>
   );

@@ -3,9 +3,15 @@ from __future__ import annotations
 from .text import normalize_selection
 from ..models.prompt import PromptContext, PromptInput
 
-SYSTEM_PROMPT_TEMPLATE = """You are Lyricist, an assistant helping refine song lyrics.\n{metadata_block}\nRespond succinctly and follow the response format instructions."""
+SYSTEM_PROMPT_TEMPLATE = """You are Lyricist, an assistant helping refine song lyrics.\n{metadata_block}\nFollow the response format exactly so the client can parse your output."""
 
-USER_PROMPT_TEMPLATE = """Current lyrics:\n{content}\n{selection_block}\nUser request: {user_message}\n\nStructure your answer as JSON with keys:\n- "commentary": array of short bullet strings describing the changes\n- "lyrics": the full revised lyrics as plain text (no commentary)"""
+USER_PROMPT_TEMPLATE = """Current lyrics:\n{content}\n{selection_block}\nUser request: {user_message}\n\nReturn JSON with this structure:\n{{
+  "commentary": ["bullet one", "bullet two"],
+  "options": [
+    {{ "label": "Option 1", "lyrics": "full revised lyrics" }},
+    {{ "label": "Option 2", "lyrics": "alternate revised lyrics" }}
+  ]
+}}\n- Provide at least one option; include more whenever the request implies alternatives.\n- "commentary" must highlight key differences between the options and the original lyrics.\n- Each "lyrics" value must contain only the lyrical content (no commentary or JSON)."""
 
 
 def build_system_prompt(context: PromptContext) -> str:

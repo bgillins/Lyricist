@@ -20,7 +20,7 @@ Start the dev server:
 npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000) in your browser. The home page loads the lyric canvas, a revision feed, and a GPT collaborator dock. Click any timestamp in the history rail to preview that revision; hit **Restore** to stage it, and press **Save** to capture tweaks. Use the chat dock on the right to request changes—the assistant answers with commentary bullets plus a GitHub-style diff of the suggested lyrics so you can review before applying.
+Then open [http://localhost:3000](http://localhost:3000) in your browser. The home page loads the lyric canvas, a revision feed, and a GPT collaborator dock. Click any timestamp in the history rail to preview that revision; hit **Restore** to stage it, and press **Save** to capture tweaks. Use the chat dock on the right to request changes—the assistant answers with commentary bullets plus GitHub-style diffs. Each option has a **Preview in Canvas** button that swaps only the matching sections (e.g., Chorus) so the rest of the song stays untouched.
 
 ## Notes
 
