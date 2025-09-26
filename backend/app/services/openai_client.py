@@ -7,7 +7,6 @@ from fastapi.concurrency import run_in_threadpool
 from openai import OpenAI
 
 from ..config import settings
-from ..models.prompt import PromptInput
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +22,7 @@ class OpenAIClient:
     def is_enabled(self) -> bool:
         return self._enabled and self._client is not None
 
-    async def generate_suggestion(
-        self, prompt: PromptInput, system_prompt: str, user_prompt: str
-    ) -> str:
+    async def generate_suggestion(self, system_prompt: str, user_prompt: str) -> str:
         if not self.is_enabled:
             raise RuntimeError("OpenAI client is not configured")
 
