@@ -3,15 +3,46 @@ from __future__ import annotations
 from .text import normalize_selection
 from ..models.prompt import PromptContext, PromptInput
 
-SYSTEM_PROMPT_TEMPLATE = """You are Lyricist, an assistant helping refine song lyrics.\n{metadata_block}\nFollow the response format exactly so the client can parse your output."""
+USER_PROMPT_TEMPLATE = """Current lyrics:
+{content}
+{selection_block}
+User request: {user_message}
 
-USER_PROMPT_TEMPLATE = """Current lyrics:\n{content}\n{selection_block}\nUser request: {user_message}\n\nReturn JSON with this structure:\n{{
+Return JSON with this structure:
+{{
   "commentary": ["bullet one", "bullet two"],
   "options": [
     {{ "label": "Option 1", "lyrics": "full revised lyrics" }},
     {{ "label": "Option 2", "lyrics": "alternate revised lyrics" }}
   ]
-}}\n- Provide at least one option; include more whenever the request implies alternatives.\n- "commentary" must highlight key differences between the options and the original lyrics.\n- Each "lyrics" value must contain only the lyrical content (no commentary or JSON)."""
+}}
+
+-----------------------------------------------------------------------
+CRITICAL FORMATTING RULES:
+-----------------------------------------------------------------------
+- Each "lyrics" field must contain ONLY the complete song lyrics
+- Preserve exact line breaks, spacing, and structure
+- NO explanations, comments, or JSON inside the lyrics field
+- Keep existing Suno meta tags: [Intro], [Verse], [Chorus], [Bridge], [Outro]
+- Add new tags only where appropriate: [Spoken Word], [Pre-chorus], [Drop]
+- Sound effects use asterisks: *rain*, *applause*, *synth swell*
+- Spoken sections: (text in parentheses) or [Spoken Word]
+
+-----------------------------------------------------------------------
+STYLE ENHANCEMENTS (when relevant to user request):
+-----------------------------------------------------------------------
+- Genre: ALL CAPS (e.g., INDIE ROCK, SYNTHWAVE)
+- Mood/descriptors: Title Case (e.g., Melancholic, Uplifting)
+- Instruments: lowercase (e.g., acoustic guitar, 808 bass)
+- Keep 4-7 descriptors for optimal results
+
+-----------------------------------------------------------------------
+REQUIREMENTS:
+-----------------------------------------------------------------------
+- Provide at least one option; more if request implies alternatives
+- "commentary" explains what changed and why (NOT in lyrics field)
+- Return complete, properly formatted lyrics ready for Suno AI
+- Maintain song flow and section transitions"""
 
 
 def build_system_prompt(context: PromptContext) -> str:

@@ -16,7 +16,7 @@ class Settings:
     """Application configuration sourced from environment variables."""
 
     openai_api_key: Optional[str]
-    openai_model: str = "gpt-4.1-mini"
+    openai_model: str = "gpt-5-nano"
 
 
 @lru_cache(maxsize=1)

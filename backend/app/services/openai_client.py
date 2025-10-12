@@ -6,6 +6,7 @@ from typing import Any, List
 from fastapi.concurrency import run_in_threadpool
 from openai import OpenAI
 
+from ..chat_storage import ChatMessage
 from ..config import settings
 
 logger = logging.getLogger(__name__)
@@ -22,14 +23,28 @@ class OpenAIClient:
     def is_enabled(self) -> bool:
         return self._enabled and self._client is not None
 
-    async def generate_suggestion(self, system_prompt: str, user_prompt: str) -> str:
+    async def generate_suggestion(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        conversation_history: list[ChatMessage] | None = None,
+    ) -> str:
         if not self.is_enabled:
             raise RuntimeError("OpenAI client is not configured")
 
         messages: List[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
         ]
+
+        # Add conversation history (excluding the current user message which is in user_prompt)
+        if conversation_history:
+            for msg in conversation_history:
+                # Skip system messages from history to avoid duplication
+                if msg.role != "system":
+                    messages.append({"role": msg.role, "content": msg.content})
+
+        # Add current user message
+        messages.append({"role": "user", "content": user_prompt})
 
         def _call() -> str:
             response = self._client.chat.completions.create(

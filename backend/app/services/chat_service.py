@@ -5,6 +5,7 @@ import logging
 from html import escape
 from typing import Any
 
+from ..chat_storage import ChatMessage
 from ..models.prompt import PromptInput
 from ..services import prompt_builder
 from ..services.openai_client import openai_client
@@ -35,7 +36,10 @@ def _normalize_option(index: int, option: dict[str, Any], fallback_html: str) ->
     }
 
 
-async def generate_suggestion(prompt: PromptInput) -> tuple[list[str], list[dict[str, str]]]:
+async def generate_suggestion(
+    prompt: PromptInput,
+    conversation_history: list[ChatMessage] | None = None,
+) -> tuple[list[str], list[dict[str, str]]]:
     system_prompt = prompt_builder.build_system_prompt(prompt.context)
     user_prompt = prompt_builder.build_user_prompt(prompt)
 
@@ -44,6 +48,7 @@ async def generate_suggestion(prompt: PromptInput) -> tuple[list[str], list[dict
             structured = await openai_client.generate_suggestion(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
+                conversation_history=conversation_history or [],
             )
             commentary, options = _parse_structured_response(structured)
             normalized = [
