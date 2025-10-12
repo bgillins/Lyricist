@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 import { ChatDock } from "@/features/chat/components/chat-dock";
-import { InlineDiffViewer } from "@/components/inline-diff-viewer";
+import { InlineDiffViewer, type InlineDiffViewerRef } from "@/components/inline-diff-viewer";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -205,6 +205,9 @@ export function LyricCanvas({
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [originalContent, setOriginalContent] = useState<string | null>(null);
   const [isChatCollapsed, setChatCollapsed] = useState(false);
+  const [approvedCount, setApprovedCount] = useState(0);
+  const [totalChangeCount, setTotalChangeCount] = useState(0);
+  const diffViewerRef = useRef<InlineDiffViewerRef>(null);
 
   // Monitor when preview mode changes
   useEffect(() => {
@@ -505,7 +508,9 @@ export function LyricCanvas({
       setPreviewContent(merged ?? decodedHtml ?? "");
       setPreviewMode(true);
       setChatCollapsed(true);
-      setMessage("Preview active. Accept to apply changes or Cancel to discard.");
+      setApprovedCount(0);
+      setTotalChangeCount(0);
+      setMessage("Preview active. Review changes line-by-line.");
 
       console.log("🟢 [LyricCanvas] State updates triggered:");
       console.log("  - originalContent set to:", currentHtml.substring(0, 100) + "...");
@@ -517,19 +522,28 @@ export function LyricCanvas({
   );
 
   const handleAcceptPreview = useCallback(() => {
-    if (!editor || !previewContent) {
+    if (!editor) {
       return;
     }
 
-    editor.commands.setContent(previewContent, { emitUpdate: false });
-    setDirty(true);
-    setState("idle");
+    // Get approved content from diff viewer
+    const approvedContent = diffViewerRef.current?.getApprovedContent();
+
+    if (approvedContent) {
+      console.log("🟢 [LyricCanvas] Applying approved content:", approvedContent);
+      editor.commands.setContent(approvedContent, { emitUpdate: false });
+      setDirty(true);
+      setState("idle");
+      setMessage("Approved changes applied. Save to capture this revision.");
+    } else {
+      console.log("🔴 [LyricCanvas] No approved content available");
+    }
+
     setPreviewMode(false);
     setPreviewContent(null);
     setOriginalContent(null);
     setChatCollapsed(false);
-    setMessage("Changes applied. Save to capture this revision.");
-  }, [editor, previewContent]);
+  }, [editor]);
 
   const handleCancelPreview = useCallback(() => {
     console.log("❌ [LyricCanvas] handleCancelPreview called - RESETTING STATE");
@@ -652,7 +666,11 @@ export function LyricCanvas({
                 className="preview-accept-button"
                 onClick={handleAcceptPreview}
               >
-                Accept
+                {approvedCount === 0
+                  ? "Accept All"
+                  : approvedCount === totalChangeCount
+                    ? "Accept"
+                    : `Accept Remaining (${totalChangeCount - approvedCount})`}
               </button>
               <button
                 type="button"
@@ -688,8 +706,13 @@ export function LyricCanvas({
               console.log("🟣 [LyricCanvas] Rendering InlineDiffViewer");
               return (
                 <InlineDiffViewer
+                  ref={diffViewerRef}
                   originalHtml={originalContent}
                   previewHtml={previewContent}
+                  onApprovalChange={(approved, total) => {
+                    setApprovedCount(approved);
+                    setTotalChangeCount(total);
+                  }}
                 />
               );
             } else if (editor) {
