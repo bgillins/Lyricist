@@ -6,6 +6,8 @@ import StarterKit from "@tiptap/starter-kit";
 
 import { ChatDock } from "@/features/chat/components/chat-dock";
 import { InlineDiffViewer, type InlineDiffViewerRef } from "@/components/inline-diff-viewer";
+import { TagLibrary } from "@/components/tag-library";
+import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -208,6 +210,9 @@ export function LyricCanvas({
   const [approvedCount, setApprovedCount] = useState(0);
   const [totalChangeCount, setTotalChangeCount] = useState(0);
   const diffViewerRef = useRef<InlineDiffViewerRef>(null);
+
+  // Tag library state
+  const [isTagLibraryOpen, setTagLibraryOpen] = useState(true);
 
   // Monitor when preview mode changes
   useEffect(() => {
@@ -561,6 +566,9 @@ export function LyricCanvas({
     [currentVersionId],
   );
 
+  // Drag and drop handlers for tag library (after editor is initialized)
+  const { handleDragStart, handleDragEnd, handleDrop, handleDragOver } = useDragAndDrop({ editor });
+
   const saveLabel = useMemo(() => {
     switch (state) {
       case "loading":
@@ -589,8 +597,32 @@ export function LyricCanvas({
   console.log("  - editor exists:", !!editor);
 
   return (
-    <section className={`canvas-layout${isChatCollapsed ? " canvas-layout-chat-collapsed" : ""}`}>
-      <aside className="history-panel">
+    <section className={`canvas-layout${!isTagLibraryOpen ? " canvas-layout-sidebar-collapsed" : ""}`}>
+      <aside className={`canvas-sidebar${!isTagLibraryOpen ? " canvas-sidebar-collapsed" : ""}`}>
+        <div className="canvas-sidebar-section tags-section">
+          <TagLibrary
+            isOpen={isTagLibraryOpen}
+            onToggle={() => setTagLibraryOpen(!isTagLibraryOpen)}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          />
+        </div>
+        <div
+          className={`canvas-sidebar-section chat-section${
+            isChatCollapsed ? " chat-section-collapsed" : ""
+          }`}
+        >
+          <ChatDock
+            documentId={documentId}
+            getDocumentContent={getDocumentContent}
+            getDocumentVersionId={getDocumentVersionId}
+            onPreviewOption={handlePreviewOption}
+            isCollapsed={isChatCollapsed}
+            onExpandCollapse={() => setChatCollapsed((previous) => !previous)}
+          />
+        </div>
+      </aside>
+      <aside className="history-panel" style={{ display: 'none' }}>
         <div className="history-header">
           <h2>Revision History</h2>
           <button type="button" className="clear-button" onClick={handleClear}>
@@ -700,7 +732,11 @@ export function LyricCanvas({
             </span>
           ) : null}
         </div>
-        <div className="editor-frame">
+        <div
+          className="editor-frame"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
           {(() => {
             if (isPreviewMode && originalContent && previewContent) {
               console.log("🟣 [LyricCanvas] Rendering InlineDiffViewer");
@@ -725,19 +761,6 @@ export function LyricCanvas({
           })()}
         </div>
       </div>
-      <ChatDock
-        documentId={documentId}
-        getDocumentContent={getDocumentContent}
-        getDocumentVersionId={getDocumentVersionId}
-        onPreviewOption={handlePreviewOption}
-        isCollapsed={isChatCollapsed}
-        onExpandCollapse={() => {
-          console.log("🔄 [LyricCanvas] ChatDock onExpandCollapse called");
-          console.log("🔄 [LyricCanvas] Current isChatCollapsed:", isChatCollapsed);
-          console.log("🔄 [LyricCanvas] Setting to:", !isChatCollapsed);
-          setChatCollapsed(!isChatCollapsed);
-        }}
-      />
     </section>
   );
 }
