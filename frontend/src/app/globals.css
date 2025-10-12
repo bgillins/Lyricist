@@ -93,6 +93,11 @@ a {
   align-items: stretch;
   min-height: 0;
   flex: 1 1 auto;
+  transition: grid-template-columns 250ms ease;
+}
+
+.canvas-layout-chat-collapsed {
+  grid-template-columns: clamp(220px, 24vw, 320px) minmax(0, 1fr) 80px;
 }
 
 .canvas-layout > * {
@@ -241,6 +246,41 @@ a {
   height: 100%;
   max-height: none;
   overflow: hidden;
+  transition: padding 250ms ease;
+}
+
+.chat-panel-collapsed {
+  padding: 1rem;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-expand-button {
+  background: linear-gradient(135deg, #45c2ff, #8f7cff);
+  color: #0a1016;
+  border: none;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  box-shadow: 0 8px 20px rgba(92, 156, 255, 0.4);
+}
+
+.chat-expand-button:hover {
+  transform: scale(1.08);
+  box-shadow: 0 12px 28px rgba(92, 156, 255, 0.5);
+}
+
+.chat-expand-icon {
+  font-size: 1.5rem;
+}
+
+.chat-header {
+  flex-shrink: 0;
 }
 
 .chat-header h2 {
@@ -437,6 +477,10 @@ a {
   color: rgba(255, 255, 255, 0.72);
 }
 
+.chat-composer {
+  flex-shrink: 0;
+}
+
 .chat-composer form {
   display: flex;
   flex-direction: column;
@@ -445,7 +489,7 @@ a {
 
 .chat-textarea {
   width: 100%;
-  resize: vertical;
+  resize: none;
   min-height: 96px;
   border-radius: 1rem;
   border: 1px solid rgba(88, 111, 143, 0.4);
@@ -672,4 +716,69 @@ a {
     height: auto;
     max-height: none;
   }
+}
+
+.inline-diff-viewer {
+  min-height: 320px;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.92);
+  font-family: var(--font-geist-sans, "Helvetica Neue", sans-serif);
+}
+
+.diff-line {
+  padding: 0.35rem 0.75rem;
+  margin: 0.25rem 0;
+  border-radius: 0.5rem;
+  transition: background-color 150ms ease;
+}
+
+.diff-line-equal {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.diff-line-delete {
+  background: rgba(255, 107, 107, 0.15);
+  color: #ff9999;
+  text-decoration: line-through;
+  border-left: 3px solid rgba(255, 107, 107, 0.6);
+}
+
+.diff-line-insert {
+  background: rgba(22, 199, 132, 0.15);
+  color: #5fffc0;
+  border-left: 3px solid rgba(22, 199, 132, 0.6);
+}
+
+.preview-accept-button {
+  background: linear-gradient(135deg, #16c784, #0f9b63);
+  color: #ffffff;
+  font-weight: 600;
+  border: none;
+  border-radius: 999px;
+  padding: 0.6rem 1.5rem;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  box-shadow: 0 10px 24px rgba(22, 199, 132, 0.35);
+}
+
+.preview-accept-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 32px rgba(22, 199, 132, 0.45);
+}
+
+.preview-cancel-button {
+  background: rgba(255, 107, 107, 0.2);
+  color: #ff9999;
+  font-weight: 600;
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: 999px;
+  padding: 0.6rem 1.5rem;
+  cursor: pointer;
+  transition: transform 120ms ease, background-color 120ms ease;
+}
+
+.preview-cancel-button:hover {
+  background: rgba(255, 107, 107, 0.3);
+  transform: translateY(-1px);
 }

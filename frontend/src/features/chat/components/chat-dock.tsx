@@ -12,6 +12,8 @@ export type ChatDockProps = {
   getSelection?: () => string | null;
   metadata?: Record<string, string> | null;
   onPreviewOption?: (content: string) => void;
+  isCollapsed?: boolean;
+  onExpandCollapse?: () => void;
 };
 
 export function ChatDock({
@@ -21,7 +23,9 @@ export function ChatDock({
   getSelection,
   metadata,
   onPreviewOption,
-}: ChatDockProps): JSX.Element {
+  isCollapsed = false,
+  onExpandCollapse,
+}: ChatDockProps) {
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -50,6 +54,21 @@ export function ChatDock({
   );
 
   const reversedMessages = useMemo(() => messages.slice().reverse(), [messages]);
+
+  if (isCollapsed) {
+    return (
+      <aside className="chat-panel chat-panel-collapsed" aria-label="Chat with assistant">
+        <button
+          type="button"
+          className="chat-expand-button"
+          onClick={onExpandCollapse}
+          aria-label="Expand chat"
+        >
+          <span className="chat-expand-icon">💬</span>
+        </button>
+      </aside>
+    );
+  }
 
   return (
     <aside className="chat-panel" aria-label="Chat with assistant">
@@ -110,7 +129,7 @@ function ChatBubble({
 }: {
   message: ChatMessage;
   onPreviewOption?: (content: string) => void;
-}): JSX.Element {
+}) {
   const isAssistant = message.role === "assistant";
 
   return (
@@ -145,7 +164,7 @@ function ChatBubble({
   );
 }
 
-function CommentaryList({ message }: { message: ChatMessage }): JSX.Element | null {
+function CommentaryList({ message }: { message: ChatMessage }) {
   const items = message.commentary?.length
     ? message.commentary
     : message.content
@@ -166,7 +185,7 @@ function CommentaryList({ message }: { message: ChatMessage }): JSX.Element | nu
   );
 }
 
-function DiffPreview({ diff }: { diff: DiffChunk[] }): JSX.Element {
+function DiffPreview({ diff }: { diff: DiffChunk[] }) {
   return (
     <pre className="chat-diff" aria-label="Diff preview">
       {diff.map((chunk, index) => (
@@ -184,7 +203,7 @@ function OptionsList({
 }: {
   options: LyricOption[];
   onPreviewOption?: (lyrics: string) => void;
-}): JSX.Element {
+}) {
   return (
     <div className="chat-options">
       {options.map((option, index) => (
@@ -195,7 +214,12 @@ function OptionsList({
               <button
                 type="button"
                 className="chat-apply-button"
-                onClick={() => onPreviewOption(option.lyrics)}
+                onClick={() => {
+                  console.log("🔵 [ChatDock] Preview button clicked");
+                  console.log("🔵 [ChatDock] option.lyrics:", option.lyrics);
+                  console.log("🔵 [ChatDock] option.lyrics length:", option.lyrics?.length);
+                  onPreviewOption(option.lyrics);
+                }}
                 disabled={!option.lyrics}
               >
                 Preview in Canvas

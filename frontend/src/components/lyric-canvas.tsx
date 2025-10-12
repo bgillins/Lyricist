@@ -5,6 +5,7 @@ import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
 import { ChatDock } from "@/features/chat/components/chat-dock";
+import { InlineDiffViewer } from "@/components/inline-diff-viewer";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -191,7 +192,7 @@ export function LyricCanvas({
   documentId,
 }: {
   documentId: string;
-}): JSX.Element {
+}) {
   const [state, setState] = useState<SaveState>("loading");
   const [message, setMessage] = useState<string | null>(null);
   const [isDirty, setDirty] = useState(false);
@@ -199,6 +200,20 @@ export function LyricCanvas({
   const [previewVersionId, setPreviewVersionId] = useState<string | null>(null);
   const [pendingRestoreVersionId, setPendingRestoreVersionId] =
     useState<string | null>(null);
+
+  const [isPreviewMode, setPreviewMode] = useState(false);
+  const [previewContent, setPreviewContent] = useState<string | null>(null);
+  const [originalContent, setOriginalContent] = useState<string | null>(null);
+  const [isChatCollapsed, setChatCollapsed] = useState(false);
+
+  // Monitor when preview mode changes
+  useEffect(() => {
+    console.log("🔔 [LyricCanvas] isPreviewMode changed to:", isPreviewMode);
+  }, [isPreviewMode]);
+
+  useEffect(() => {
+    console.log("🔔 [LyricCanvas] isChatCollapsed changed to:", isChatCollapsed);
+  }, [isChatCollapsed]);
 
   const [historyState, setHistoryState] = useState<HistoryState>("idle");
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -279,7 +294,7 @@ export function LyricCanvas({
         );
 
         if (response.status === 404) {
-          editor.commands.setContent("", false);
+          editor.commands.setContent("", { emitUpdate: false });
           setDirty(false);
           setCurrentVersionId(null);
           setPreviewVersionId(null);
@@ -294,7 +309,7 @@ export function LyricCanvas({
         }
 
         const payload = (await response.json()) as DocumentResponse;
-        editor.commands.setContent(payload.content ?? "", false);
+        editor.commands.setContent(payload.content ?? "", { emitUpdate: false });
         setDirty(false);
         setState("idle");
         setCurrentVersionId(payload.version_id);
@@ -401,7 +416,7 @@ export function LyricCanvas({
         throw new Error(`Failed to clear documents (${response.status})`);
       }
 
-      editor?.commands.setContent("", false);
+      editor?.commands.setContent("", { emitUpdate: false });
       setDirty(false);
       setCurrentVersionId(null);
       setPreviewVersionId(null);
@@ -426,7 +441,7 @@ export function LyricCanvas({
         return;
       }
 
-      editor.commands.setContent(version.content ?? "", false);
+      editor.commands.setContent(version.content ?? "", { emitUpdate: false });
       setDirty(true);
       setState("idle");
       setPreviewVersionId(version.id);
@@ -446,7 +461,7 @@ export function LyricCanvas({
         return;
       }
 
-      editor.commands.setContent(version.content ?? "", false);
+      editor.commands.setContent(version.content ?? "", { emitUpdate: false });
       setDirty(true);
       setState("idle");
       setPreviewVersionId(version.id);
@@ -462,20 +477,68 @@ export function LyricCanvas({
 
   const handlePreviewOption = useCallback(
     (optionHtml: string) => {
+      console.log("🟢 [LyricCanvas] handlePreviewOption called");
+      console.log("🟢 [LyricCanvas] editor exists:", !!editor);
+      console.log("🟢 [LyricCanvas] optionHtml (raw):", optionHtml);
+
       if (!editor) {
+        console.log("🔴 [LyricCanvas] No editor - returning early");
         return;
       }
 
-      const merged = mergeLyricsIntoDocument(editor.getHTML(), optionHtml);
-      editor.commands.setContent(merged ?? optionHtml ?? "", false);
-      setDirty(true);
-      setState("idle");
-      setPreviewVersionId(null);
-      setPendingRestoreVersionId(null);
-      setMessage("Preview loaded. Save to capture the revision or undo to discard.");
+      // Decode HTML entities if double-encoded (backend issue)
+      let decodedHtml = optionHtml;
+      if (typeof document !== "undefined") {
+        const textarea = document.createElement("textarea");
+        textarea.innerHTML = optionHtml;
+        decodedHtml = textarea.value;
+        console.log("🟢 [LyricCanvas] optionHtml (decoded):", decodedHtml);
+      }
+
+      const currentHtml = editor.getHTML();
+      console.log("🟢 [LyricCanvas] currentHtml from editor:", currentHtml);
+
+      const merged = mergeLyricsIntoDocument(currentHtml, decodedHtml);
+      console.log("🟢 [LyricCanvas] merged result:", merged);
+
+      setOriginalContent(currentHtml);
+      setPreviewContent(merged ?? decodedHtml ?? "");
+      setPreviewMode(true);
+      setChatCollapsed(true);
+      setMessage("Preview active. Accept to apply changes or Cancel to discard.");
+
+      console.log("🟢 [LyricCanvas] State updates triggered:");
+      console.log("  - originalContent set to:", currentHtml.substring(0, 100) + "...");
+      console.log("  - previewContent set to:", (merged ?? decodedHtml ?? "").substring(0, 100) + "...");
+      console.log("  - isPreviewMode set to: true");
+      console.log("  - isChatCollapsed set to: true");
     },
     [editor],
   );
+
+  const handleAcceptPreview = useCallback(() => {
+    if (!editor || !previewContent) {
+      return;
+    }
+
+    editor.commands.setContent(previewContent, { emitUpdate: false });
+    setDirty(true);
+    setState("idle");
+    setPreviewMode(false);
+    setPreviewContent(null);
+    setOriginalContent(null);
+    setChatCollapsed(false);
+    setMessage("Changes applied. Save to capture this revision.");
+  }, [editor, previewContent]);
+
+  const handleCancelPreview = useCallback(() => {
+    console.log("❌ [LyricCanvas] handleCancelPreview called - RESETTING STATE");
+    setPreviewMode(false);
+    setPreviewContent(null);
+    setOriginalContent(null);
+    setChatCollapsed(false);
+    setMessage(null);
+  }, []);
 
   const getDocumentContent = useCallback(() => editor?.getHTML() ?? "", [editor]);
 
@@ -504,8 +567,15 @@ export function LyricCanvas({
   const showStatus =
     Boolean(message) || state === "loading" || state === "saving";
 
+  console.log("🟡 [LyricCanvas] Render - State Check:");
+  console.log("  - isPreviewMode:", isPreviewMode);
+  console.log("  - originalContent exists:", !!originalContent);
+  console.log("  - previewContent exists:", !!previewContent);
+  console.log("  - isChatCollapsed:", isChatCollapsed);
+  console.log("  - editor exists:", !!editor);
+
   return (
-    <section className="canvas-layout">
+    <section className={`canvas-layout${isChatCollapsed ? " canvas-layout-chat-collapsed" : ""}`}>
       <aside className="history-panel">
         <div className="history-header">
           <h2>Revision History</h2>
@@ -575,14 +645,33 @@ export function LyricCanvas({
       </aside>
       <div className="canvas-card">
         <div className="canvas-toolbar">
-          <button
-            type="button"
-            className="save-button"
-            onClick={handleSave}
-            disabled={!canSave}
-          >
-            {saveLabel}
-          </button>
+          {isPreviewMode ? (
+            <>
+              <button
+                type="button"
+                className="preview-accept-button"
+                onClick={handleAcceptPreview}
+              >
+                Accept
+              </button>
+              <button
+                type="button"
+                className="preview-cancel-button"
+                onClick={handleCancelPreview}
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="save-button"
+              onClick={handleSave}
+              disabled={!canSave}
+            >
+              {saveLabel}
+            </button>
+          )}
           {showStatus ? (
             <span
               className={`status-pill status-${state}`}
@@ -594,11 +683,23 @@ export function LyricCanvas({
           ) : null}
         </div>
         <div className="editor-frame">
-          {editor ? (
-            <EditorContent editor={editor} />
-          ) : (
-            <div className="editor-placeholder">Preparing editor…</div>
-          )}
+          {(() => {
+            if (isPreviewMode && originalContent && previewContent) {
+              console.log("🟣 [LyricCanvas] Rendering InlineDiffViewer");
+              return (
+                <InlineDiffViewer
+                  originalHtml={originalContent}
+                  previewHtml={previewContent}
+                />
+              );
+            } else if (editor) {
+              console.log("🟣 [LyricCanvas] Rendering EditorContent");
+              return <EditorContent editor={editor} />;
+            } else {
+              console.log("🟣 [LyricCanvas] Rendering placeholder");
+              return <div className="editor-placeholder">Preparing editor…</div>;
+            }
+          })()}
         </div>
       </div>
       <ChatDock
@@ -606,6 +707,13 @@ export function LyricCanvas({
         getDocumentContent={getDocumentContent}
         getDocumentVersionId={getDocumentVersionId}
         onPreviewOption={handlePreviewOption}
+        isCollapsed={isChatCollapsed}
+        onExpandCollapse={() => {
+          console.log("🔄 [LyricCanvas] ChatDock onExpandCollapse called");
+          console.log("🔄 [LyricCanvas] Current isChatCollapsed:", isChatCollapsed);
+          console.log("🔄 [LyricCanvas] Setting to:", !isChatCollapsed);
+          setChatCollapsed(!isChatCollapsed);
+        }}
       />
     </section>
   );

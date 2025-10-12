@@ -1,6 +1,6 @@
 import { LyricCanvas } from "@/components/lyric-canvas";
 
-export default function HomePage(): JSX.Element {
+export default function HomePage() {
   return (
     <main className="app-shell">
       <header className="page-header">
