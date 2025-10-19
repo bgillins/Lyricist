@@ -207,6 +207,7 @@ export function LyricCanvas({
   const [previewContent, setPreviewContent] = useState<string | null>(null);
   const [originalContent, setOriginalContent] = useState<string | null>(null);
   const [isChatCollapsed, setChatCollapsed] = useState(false);
+  const [isHistoryOpen, setHistoryOpen] = useState(false);
   const [approvedCount, setApprovedCount] = useState(0);
   const [totalChangeCount, setTotalChangeCount] = useState(0);
   const diffViewerRef = useRef<InlineDiffViewerRef>(null);
@@ -622,106 +623,53 @@ export function LyricCanvas({
           />
         </div>
       </aside>
-      <aside className="history-panel" style={{ display: 'none' }}>
-        <div className="history-header">
-          <h2>Revision History</h2>
-          <button type="button" className="clear-button" onClick={handleClear}>
-            Clear All
-          </button>
-        </div>
-        {historyState === "error" ? (
-          <p className="history-status history-status-error">
-            {historyError ?? "Unable to load history"}
-          </p>
-        ) : versions.length === 0 ? (
-          <p className="history-empty">
-            {historyState === "loading"
-              ? "Loading history…"
-              : "No saved versions yet. Capture your first idea and hit save to see it appear here."}
-          </p>
-        ) : (
-          <>
-            <ul className="history-list">
-              {versions.map((version) => {
-                const isCurrent = version.id === currentVersionId;
-                const isPreview = version.id === previewVersionId;
-                const isPending = version.id === pendingRestoreVersionId;
-                return (
-                  <li
-                    key={version.id}
-                    className={`history-entry${
-                      isCurrent ? " history-entry-current" : ""
-                    }${
-                      isPreview ? " history-entry-preview" : ""
-                    }${
-                      isPending ? " history-entry-pending" : ""
-                    }`}
-                    title={`Version ${version.id}`}
-                  >
-                    <button
-                      type="button"
-                      className="history-entry-button"
-                      onClick={() => handlePreview(version)}
-                    >
-                      <span className="history-entry-time">
-                        {formatTimestamp(version.created_at)}
-                      </span>
-                      <span className="history-entry-snippet">
-                        {toSnippet(version.content)}
-                      </span>
-                    </button>
-                    <div className="history-entry-actions">
-                      <button
-                        type="button"
-                        className="history-restore-button"
-                        onClick={() => handleRestore(version)}
-                      >
-                        {isPending ? "Selected" : "Restore"}
-                      </button>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-            {historyState === "loading" ? (
-              <p className="history-status">Refreshing…</p>
-            ) : null}
-          </>
-        )}
-      </aside>
       <div className="canvas-card">
         <div className="canvas-toolbar">
-          {isPreviewMode ? (
-            <>
+          <div className="canvas-toolbar-actions">
+            {isPreviewMode ? (
+              <>
+                <button
+                  type="button"
+                  className="preview-accept-button"
+                  onClick={handleAcceptPreview}
+                >
+                  {approvedCount === 0
+                    ? "Accept All"
+                    : approvedCount === totalChangeCount
+                      ? "Accept"
+                      : `Accept Remaining (${totalChangeCount - approvedCount})`}
+                </button>
+                <button
+                  type="button"
+                  className="preview-cancel-button"
+                  onClick={handleCancelPreview}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
               <button
                 type="button"
-                className="preview-accept-button"
-                onClick={handleAcceptPreview}
+                className="save-button"
+                onClick={handleSave}
+                disabled={!canSave}
               >
-                {approvedCount === 0
-                  ? "Accept All"
-                  : approvedCount === totalChangeCount
-                    ? "Accept"
-                    : `Accept Remaining (${totalChangeCount - approvedCount})`}
+                {saveLabel}
               </button>
-              <button
-                type="button"
-                className="preview-cancel-button"
-                onClick={handleCancelPreview}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
+            )}
             <button
               type="button"
-              className="save-button"
-              onClick={handleSave}
-              disabled={!canSave}
+              className={`history-toggle-button${isHistoryOpen ? " history-toggle-button-active" : ""}`}
+              onClick={() => setHistoryOpen((previous) => !previous)}
+              aria-expanded={isHistoryOpen}
+              aria-controls="revision-history-panel"
             >
-              {saveLabel}
+              <span className="history-toggle-icon" aria-hidden="true">
+                🕒
+              </span>
+              <span className="history-toggle-label">Revisions</span>
             </button>
-          )}
+          </div>
           {showStatus ? (
             <span
               className={`status-pill status-${state}`}
@@ -732,6 +680,89 @@ export function LyricCanvas({
             </span>
           ) : null}
         </div>
+        {isHistoryOpen ? (
+          <aside
+            id="revision-history-panel"
+            className="history-panel history-panel-open"
+            aria-label="Revision history"
+          >
+            <div className="history-header">
+              <h2>Revision History</h2>
+              <div className="history-header-actions">
+                <button type="button" className="clear-button" onClick={handleClear}>
+                  Clear All
+                </button>
+                <button
+                  type="button"
+                  className="history-close-button"
+                  onClick={() => setHistoryOpen(false)}
+                  aria-label="Close history"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            {historyState === "error" ? (
+              <p className="history-status history-status-error">
+                {historyError ?? "Unable to load history"}
+              </p>
+            ) : versions.length === 0 ? (
+              <p className="history-empty">
+                {historyState === "loading"
+                  ? "Loading history…"
+                  : "No saved versions yet. Capture your first idea and hit save to see it appear here."}
+              </p>
+            ) : (
+              <>
+                <ul className="history-list">
+                  {versions.map((version) => {
+                    const isCurrent = version.id === currentVersionId;
+                    const isPreview = version.id === previewVersionId;
+                    const isPending = version.id === pendingRestoreVersionId;
+                    return (
+                      <li
+                        key={version.id}
+                        className={`history-entry${
+                          isCurrent ? " history-entry-current" : ""
+                        }${
+                          isPreview ? " history-entry-preview" : ""
+                        }${
+                          isPending ? " history-entry-pending" : ""
+                        }`}
+                        title={`Version ${version.id}`}
+                      >
+                        <button
+                          type="button"
+                          className="history-entry-button"
+                          onClick={() => handlePreview(version)}
+                        >
+                          <span className="history-entry-time">
+                            {formatTimestamp(version.created_at)}
+                          </span>
+                          <span className="history-entry-snippet">
+                            {toSnippet(version.content)}
+                          </span>
+                        </button>
+                        <div className="history-entry-actions">
+                          <button
+                            type="button"
+                            className="history-restore-button"
+                            onClick={() => handleRestore(version)}
+                          >
+                            {isPending ? "Selected" : "Restore"}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {historyState === "loading" ? (
+                  <p className="history-status">Refreshing…</p>
+                ) : null}
+              </>
+            )}
+          </aside>
+        ) : null}
         <div
           className="editor-frame"
           onDrop={handleDrop}
