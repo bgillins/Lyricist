@@ -8,6 +8,7 @@ import type {
   ChatResponsePayload,
   DiffChunk,
   LyricOption,
+  SuggestionScope,
 } from "@/features/chat/types";
 
 const API_BASE_URL =
@@ -17,15 +18,24 @@ export type UseChatSessionOptions = {
   documentId: string;
   getDocumentContent: () => string;
   getDocumentVersionId: () => string | null;
-  getSelection?: () => string | null;
   metadata?: Record<string, string> | null;
+};
+
+export type SelectionPayload = {
+  text: string;
+  html?: string;
+};
+
+export type SendMessageOptions = {
+  scope?: SuggestionScope;
+  selection?: SelectionPayload | null;
 };
 
 export type UseChatSessionReturn = {
   messages: ChatMessage[];
   isSending: boolean;
   error: string | null;
-  sendMessage: (message: string) => Promise<void>;
+  sendMessage: (message: string, options?: SendMessageOptions) => Promise<boolean>;
   reset: () => void;
 };
 
@@ -37,24 +47,21 @@ const nextMessageId = () => {
 };
 
 export function useChatSession(options: UseChatSessionOptions): UseChatSessionReturn {
-  const {
-    documentId,
-    getDocumentContent,
-    getDocumentVersionId,
-    metadata,
-    getSelection,
-  } = options;
+  const { documentId, getDocumentContent, getDocumentVersionId, metadata } = options;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const sendMessage = useCallback(
-    async (message: string) => {
+    async (message: string, options?: SendMessageOptions) => {
       const trimmed = message.trim();
       if (!trimmed) {
-        return;
+        return false;
       }
+
+      const scope: SuggestionScope = options?.scope ?? "document";
+      const selectionPayload = options?.selection ?? null;
 
       const userMessage: ChatMessage = {
         id: nextMessageId(),
@@ -62,6 +69,7 @@ export function useChatSession(options: UseChatSessionOptions): UseChatSessionRe
         content: trimmed,
         createdAt: Date.now(),
         status: "complete",
+        scope,
       };
 
       const pendingAssistant: ChatMessage = {
@@ -70,6 +78,7 @@ export function useChatSession(options: UseChatSessionOptions): UseChatSessionRe
         content: "",
         createdAt: Date.now(),
         status: "pending",
+        scope,
       };
 
       setMessages((current) => [...current, userMessage, pendingAssistant]);
@@ -79,7 +88,7 @@ export function useChatSession(options: UseChatSessionOptions): UseChatSessionRe
       const payload: ChatRequestPayload = {
         message: trimmed,
         document_content: getDocumentContent(),
-        selection: getSelection ? getSelection() : null,
+        selection: selectionPayload?.html ?? selectionPayload?.text ?? null,
         context: {
           document_id: documentId,
           document_version_id: getDocumentVersionId(),
@@ -109,13 +118,15 @@ export function useChatSession(options: UseChatSessionOptions): UseChatSessionRe
                   ...msg,
                   content: data.commentary.join("\n"),
                   commentary: data.commentary,
-                  options: normalizeOptions(data.options),
+                  options: normalizeOptions(data.options, scope),
                   status: "complete",
                   createdAt: Date.now(),
+                  scope,
                 }
               : msg,
           ),
         );
+        return true;
       } catch (err) {
         console.error(err);
         const errorMessage =
@@ -124,15 +135,22 @@ export function useChatSession(options: UseChatSessionOptions): UseChatSessionRe
         setMessages((current) =>
           current.map((msg) =>
             msg.id === pendingAssistant.id
-              ? { ...msg, status: "error", error: errorMessage, createdAt: Date.now() }
+              ? {
+                  ...msg,
+                  status: "error",
+                  error: errorMessage,
+                  createdAt: Date.now(),
+                  scope,
+                }
               : msg,
           ),
         );
+        return false;
       } finally {
         setIsSending(false);
       }
     },
-    [documentId, getDocumentContent, getDocumentVersionId, metadata, getSelection],
+    [documentId, getDocumentContent, getDocumentVersionId, metadata],
   );
 
   const reset = useCallback(() => {
@@ -153,7 +171,7 @@ function normalizeDiff(chunks: DiffChunk[] | undefined): DiffChunk[] {
   return chunks.map((chunk) => ({ ...chunk, text: chunk.text ?? "" }));
 }
 
-function normalizeOptions(options: LyricOption[] | undefined): LyricOption[] {
+function normalizeOptions(options: LyricOption[] | undefined, scope: SuggestionScope): LyricOption[] {
   if (!options) {
     return [];
   }
@@ -161,5 +179,6 @@ function normalizeOptions(options: LyricOption[] | undefined): LyricOption[] {
     label: option.label || `Option ${index + 1}`,
     lyrics: option.lyrics || "",
     diff: normalizeDiff(option.diff),
+    scope: option.scope ?? scope,
   }));
 }

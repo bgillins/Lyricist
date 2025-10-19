@@ -10,9 +10,11 @@ from pydantic import BaseModel
 
 class ChatMessage(BaseModel):
     """Represents a single message in the conversation history."""
+
     role: Literal["system", "user", "assistant"]
     content: str
     timestamp: datetime
+    context: Literal["document", "selection"] | None = None
 
 
 class ChatHistory(BaseModel):
@@ -71,6 +73,8 @@ class ChatHistoryStore:
         document_id: str,
         role: Literal["system", "user", "assistant"],
         content: str,
+        *,
+        context: Literal["document", "selection"] | None = None,
     ) -> ChatHistory:
         """Add a message to the conversation history."""
         history = self.load(document_id)
@@ -79,6 +83,7 @@ class ChatHistoryStore:
             role=role,
             content=content,
             timestamp=datetime.now(timezone.utc),
+            context=context,
         )
         history.messages.append(message)
 

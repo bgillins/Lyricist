@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 
-import { ChatDock } from "@/features/chat/components/chat-dock";
+import { ChatDock, type SelectionRequest } from "@/features/chat/components/chat-dock";
+import type { LyricOption, SuggestionScope } from "@/features/chat/types";
 import { InlineDiffViewer, type InlineDiffViewerRef } from "@/components/inline-diff-viewer";
 import { TagLibrary } from "@/components/tag-library";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
@@ -38,6 +39,15 @@ type SectionBlock = {
   heading: string | null;
   paragraphs: string[];
 };
+
+type SelectionSnapshot = {
+  from: number;
+  to: number;
+  text: string;
+  html: string;
+};
+
+const MAX_SELECTION_SNIPPET_LENGTH = 180;
 
 function parseSections(html: string): SectionBlock[] {
   if (typeof document === "undefined") {
@@ -190,6 +200,41 @@ function toSnippet(html: string): string {
   return `${plain.slice(0, HISTORY_SNIPPET_LENGTH)}…`;
 }
 
+function createSelectionPrompt(text: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return "Please help refine the highlighted lyrics.";
+  }
+
+  const snippet =
+    normalized.length > MAX_SELECTION_SNIPPET_LENGTH
+      ? `${normalized.slice(0, MAX_SELECTION_SNIPPET_LENGTH)}…`
+      : normalized;
+
+  return `Help refine this highlighted passage while keeping the intent intact.\n\nSelection snippet: "${snippet}"`;
+}
+
+function replaceSelectionHtml(
+  sourceHtml: string,
+  targetHtml: string,
+  replacementHtml: string,
+): string | null {
+  if (!sourceHtml || !targetHtml) {
+    return null;
+  }
+
+  const targetIndex = sourceHtml.indexOf(targetHtml);
+  if (targetIndex === -1) {
+    return null;
+  }
+
+  return (
+    sourceHtml.slice(0, targetIndex) +
+    replacementHtml +
+    sourceHtml.slice(targetIndex + targetHtml.length)
+  );
+}
+
 export function LyricCanvas({
   documentId,
 }: {
@@ -211,6 +256,137 @@ export function LyricCanvas({
   const [approvedCount, setApprovedCount] = useState(0);
   const [totalChangeCount, setTotalChangeCount] = useState(0);
   const diffViewerRef = useRef<InlineDiffViewerRef>(null);
+  const [selectionSnapshot, setSelectionSnapshot] =
+    useState<SelectionSnapshot | null>(null);
+  const [lockedSelection, setLockedSelection] = useState<SelectionSnapshot | null>(null);
+  const lockedSelectionRef = useRef<SelectionSnapshot | null>(null);
+  const [pendingSelectionRequest, setPendingSelectionRequest] =
+    useState<SelectionRequest | null>(null);
+  const [selectionAwaitingResponse, setSelectionAwaitingResponse] = useState(false);
+
+  const editor = useEditor({
+    extensions: [StarterKit],
+    editorProps: {
+      attributes: {
+        class: "editor-content",
+        spellcheck: "true",
+      },
+    },
+    content: "",
+    onUpdate: () => {
+      setDirty(true);
+      setState((current) => (current === "saved" ? "idle" : current));
+    },
+    immediatelyRender: false,
+  });
+
+  useEffect(() => {
+    lockedSelectionRef.current = lockedSelection;
+  }, [lockedSelection]);
+
+  const buildSelectionRequest = useCallback((): SelectionRequest | null => {
+    if (!editor) {
+      return null;
+    }
+
+    const source = selectionSnapshot ?? lockedSelectionRef.current;
+    if (!source || !source.text.trim()) {
+      setMessage("Select lyrics in the canvas to ask the assistant about them.");
+      return null;
+    }
+
+    const sanitizedHtml = source.html || `\u003cp>${source.text}\u003c/p>`;
+    const snapshot: SelectionSnapshot = { ...source, html: sanitizedHtml };
+    setLockedSelection(snapshot);
+
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: snapshot.from, to: snapshot.to })
+      .run();
+
+    return {
+      prompt: createSelectionPrompt(snapshot.text),
+      selection: {
+        text: snapshot.text,
+        html: sanitizedHtml,
+      },
+    };
+  }, [editor, selectionSnapshot]);
+
+  const handleSelectionRequestConsumed = useCallback(() => {
+    setPendingSelectionRequest(null);
+  }, []);
+
+  const handleSelectionRequestSubmitted = useCallback(() => {
+    const snapshot = lockedSelectionRef.current;
+    if (!editor || !snapshot) {
+      return;
+    }
+
+    setSelectionAwaitingResponse(true);
+    setMessage("Assistant is reviewing the highlighted lyrics...");
+
+    editor
+      .chain()
+      .focus()
+      .setTextSelection({ from: snapshot.from, to: snapshot.to })
+      .run();
+  }, [editor]);
+
+  const handleSelectionResponseReady = useCallback(() => {
+    setSelectionAwaitingResponse(false);
+  }, []);
+
+  const handleSelectionButton = useCallback(() => {
+    const request = buildSelectionRequest();
+    if (!request) {
+      return;
+    }
+
+    setPendingSelectionRequest(request);
+    setChatCollapsed(false);
+  }, [buildSelectionRequest]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (!(event.key === "h" || event.key === "H")) {
+        return;
+      }
+
+      const isModifierHeld = event.metaKey || event.ctrlKey;
+      if (!isModifierHeld || !event.shiftKey) {
+        return;
+      }
+
+      const editorElement = editor?.view.dom as HTMLElement | undefined;
+      const activeElement = document.activeElement;
+      const isWithinEditor =
+        editorElement && activeElement instanceof Node && editorElement.contains(activeElement);
+
+      if (!isWithinEditor) {
+        return;
+      }
+
+      const request = buildSelectionRequest();
+      if (!request) {
+        return;
+      }
+
+      event.preventDefault();
+      setPendingSelectionRequest(request);
+      setChatCollapsed(false);
+    };
+
+    window.addEventListener("keydown", handleShortcut);
+    return () => {
+      window.removeEventListener("keydown", handleShortcut);
+    };
+  }, [buildSelectionRequest, editor]);
 
   // Tag library state
   const [isTagLibraryOpen, setTagLibraryOpen] = useState(true);
@@ -228,21 +404,52 @@ export function LyricCanvas({
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [versions, setVersions] = useState<DocumentVersion[]>([]);
 
-  const editor = useEditor({
-    extensions: [StarterKit],
-    editorProps: {
-      attributes: {
-        class: "editor-content",
-        spellcheck: "true",
-      },
-    },
-    content: "",
-    onUpdate: () => {
-      setDirty(true);
-      setState((current) => (current === "saved" ? "idle" : current));
-    },
-    immediatelyRender: false,
-  });
+  useEffect(() => {
+    if (!editor) {
+      return;
+    }
+
+    const editorElement = editor.view.dom as HTMLElement;
+
+    const updateSelection = () => {
+      const { from, to } = editor.state.selection;
+      if (from === to) {
+        setSelectionSnapshot(null);
+        return;
+      }
+
+      const text = editor.state.doc.textBetween(from, to, "\n");
+      let html = "";
+
+      if (typeof window !== "undefined") {
+        const domSelection = window.getSelection();
+        if (domSelection && domSelection.rangeCount > 0) {
+          const range = domSelection.getRangeAt(0);
+          if (editorElement.contains(range.commonAncestorContainer)) {
+            const container = document.createElement("div");
+            container.appendChild(range.cloneContents());
+            html = container.innerHTML;
+          }
+        }
+      }
+
+      const snapshot: SelectionSnapshot = {
+        from,
+        to,
+        text,
+        html: html || `\u003cp>${text}\u003c/p>`,
+      };
+
+      setSelectionSnapshot(snapshot);
+    };
+
+    editor.on("selectionUpdate", updateSelection);
+    updateSelection();
+
+    return () => {
+      editor.off("selectionUpdate", updateSelection);
+    };
+  }, [editor]);
 
   const loadHistory = useCallback(
     async (options?: { signal?: AbortSignal }) => {
@@ -308,6 +515,10 @@ export function LyricCanvas({
           setCurrentVersionId(null);
           setPreviewVersionId(null);
           setPendingRestoreVersionId(null);
+          setLockedSelection(null);
+          setSelectionSnapshot(null);
+          setPendingSelectionRequest(null);
+          setSelectionAwaitingResponse(false);
           setState("idle");
           await loadHistory({ signal: controller.signal });
           return;
@@ -324,6 +535,10 @@ export function LyricCanvas({
         setCurrentVersionId(payload.version_id);
         setPreviewVersionId(null);
         setPendingRestoreVersionId(null);
+        setLockedSelection(null);
+        setSelectionSnapshot(null);
+        setPendingSelectionRequest(null);
+        setSelectionAwaitingResponse(false);
         setMessage(
           `Last saved ${new Date(payload.updated_at).toLocaleTimeString()}`,
         );
@@ -485,30 +700,35 @@ export function LyricCanvas({
   );
 
   const handlePreviewOption = useCallback(
-    (optionHtml: string) => {
-      console.log("🟢 [LyricCanvas] handlePreviewOption called");
-      console.log("🟢 [LyricCanvas] editor exists:", !!editor);
-      console.log("🟢 [LyricCanvas] optionHtml (raw):", optionHtml);
-
+    (option: LyricOption) => {
       if (!editor) {
-        console.log("🔴 [LyricCanvas] No editor - returning early");
         return;
       }
 
-      // Decode HTML entities if double-encoded (backend issue)
-      let decodedHtml = optionHtml;
+      const rawHtml = option.lyrics ?? "";
+      let decodedHtml = rawHtml;
       if (typeof document !== "undefined") {
         const textarea = document.createElement("textarea");
-        textarea.innerHTML = optionHtml;
+        textarea.innerHTML = rawHtml;
         decodedHtml = textarea.value;
-        console.log("🟢 [LyricCanvas] optionHtml (decoded):", decodedHtml);
       }
 
       const currentHtml = editor.getHTML();
-      console.log("🟢 [LyricCanvas] currentHtml from editor:", currentHtml);
+      const scope: SuggestionScope = option.scope ?? (lockedSelectionRef.current ? "selection" : "document");
 
-      const merged = mergeLyricsIntoDocument(currentHtml, decodedHtml);
-      console.log("🟢 [LyricCanvas] merged result:", merged);
+      let merged = mergeLyricsIntoDocument(currentHtml, decodedHtml);
+
+      if (scope === "selection" && lockedSelectionRef.current) {
+        const replaced = replaceSelectionHtml(
+          currentHtml,
+          lockedSelectionRef.current.html,
+          decodedHtml,
+        );
+
+        if (replaced) {
+          merged = replaced;
+        }
+      }
 
       setOriginalContent(currentHtml);
       setPreviewContent(merged ?? decodedHtml ?? "");
@@ -517,12 +737,7 @@ export function LyricCanvas({
       setApprovedCount(0);
       setTotalChangeCount(0);
       setMessage("Preview active. Review changes line-by-line.");
-
-      console.log("🟢 [LyricCanvas] State updates triggered:");
-      console.log("  - originalContent set to:", currentHtml.substring(0, 100) + "...");
-      console.log("  - previewContent set to:", (merged ?? decodedHtml ?? "").substring(0, 100) + "...");
-      console.log("  - isPreviewMode set to: true");
-      console.log("  - isChatCollapsed set to: true");
+      setSelectionAwaitingResponse(false);
     },
     [editor],
   );
@@ -549,6 +764,8 @@ export function LyricCanvas({
     setPreviewContent(null);
     setOriginalContent(null);
     setChatCollapsed(false);
+    setLockedSelection(null);
+    setSelectionAwaitingResponse(false);
   }, [editor]);
 
   const handleCancelPreview = useCallback(() => {
@@ -558,6 +775,8 @@ export function LyricCanvas({
     setOriginalContent(null);
     setChatCollapsed(false);
     setMessage(null);
+    setLockedSelection(null);
+    setSelectionAwaitingResponse(false);
   }, []);
 
   const getDocumentContent = useCallback(() => editor?.getHTML() ?? "", [editor]);
@@ -589,6 +808,11 @@ export function LyricCanvas({
     Boolean(editor) && isDirty && state !== "saving" && state !== "loading";
   const showStatus =
     Boolean(message) || state === "loading" || state === "saving";
+  const canTargetSelection = useMemo(() => {
+    const active = selectionSnapshot?.text?.trim();
+    const locked = lockedSelection?.text?.trim();
+    return Boolean(active) || Boolean(locked);
+  }, [lockedSelection, selectionSnapshot]);
 
   console.log("🟡 [LyricCanvas] Render - State Check:");
   console.log("  - isPreviewMode:", isPreviewMode);
@@ -617,6 +841,11 @@ export function LyricCanvas({
             documentId={documentId}
             getDocumentContent={getDocumentContent}
             getDocumentVersionId={getDocumentVersionId}
+            prepareSelectionRequest={buildSelectionRequest}
+            incomingSelectionRequest={pendingSelectionRequest}
+            onSelectionRequestConsumed={handleSelectionRequestConsumed}
+            onSelectionRequestSubmitted={handleSelectionRequestSubmitted}
+            onSelectionResponseReady={handleSelectionResponseReady}
             onPreviewOption={handlePreviewOption}
             isCollapsed={isChatCollapsed}
             onExpandCollapse={() => setChatCollapsed((previous) => !previous)}
@@ -668,6 +897,15 @@ export function LyricCanvas({
                 🕒
               </span>
               <span className="history-toggle-label">Revisions</span>
+            </button>
+            <button
+              type="button"
+              className="selection-request-button"
+              onClick={handleSelectionButton}
+              disabled={!canTargetSelection || selectionAwaitingResponse || isPreviewMode}
+              title="Send the highlighted lyrics to the assistant"
+            >
+              Ask About Highlight
             </button>
           </div>
           {showStatus ? (

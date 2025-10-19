@@ -10,6 +10,7 @@ Your role is to:
 - Maintain proper Suno AI formatting with meta tags
 - Preserve the artistic intent while enhancing quality
 - Provide multiple creative options when appropriate
+- When a highlighted excerpt is provided, focus on rewriting that passage unless the request asks for broader changes
 
 {metadata_block}
 
@@ -18,6 +19,7 @@ Always respond with valid JSON containing commentary and lyric options."""
 USER_PROMPT_TEMPLATE = """Current lyrics:
 {content}
 {selection_block}
+{selection_instructions}
 User request: {user_message}
 
 Return JSON with this structure:
@@ -71,13 +73,19 @@ def build_system_prompt(context: PromptContext) -> str:
 
 def build_user_prompt(prompt: PromptInput) -> str:
     selection_text = normalize_selection(prompt.context.selection or "")
+    selection_instructions = ""
     selection_block = (
         f"Highlighted excerpt:\n{selection_text}\n"
         if selection_text
         else ""
     )
+    if selection_text:
+        selection_instructions = (
+            "Focus on rewriting only the highlighted excerpt. Respond with the revised excerpt using the same section markers and formatting."
+        )
     return USER_PROMPT_TEMPLATE.format(
         content=prompt.document_content,
         selection_block=selection_block,
+        selection_instructions=selection_instructions,
         user_message=prompt.user_message,
     )

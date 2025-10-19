@@ -57,6 +57,10 @@ class LyricOption(BaseModel):
     label: str
     lyrics: str
     diff: list[DiffChunk] = Field(default_factory=list)
+    scope: Literal["document", "selection"] = Field(
+        default="document",
+        description="Indicates whether the suggestion targets the whole document or the active selection",
+    )
 
 
 class ChatResponse(BaseModel):

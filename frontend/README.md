@@ -28,4 +28,5 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser. The ho
 - Every save creates a new timestamped revision that appears in the history rail. Click a row to preview it, tap **Restore** to stage that revision, and press **Save** when you're ready to promote it.
 - Clear button (double-confirmed) wipes the archive if you want to reset during prototyping.
 - The GPT dock keeps commentary separate from the proposed lyrics and surfaces multiple options when provided, each with its own diff and apply button.
+- Highlight any passage in the canvas and use **Ask About Highlight**, press **Shift + Cmd/Ctrl + H**, or tap the chat's **Highlight → Assistant** action to send only that excerpt to GPT; returned options can be previewed and applied directly to the highlighted span.
 - Additional panels (metadata, exports) will plug into this layout as we expand the prototype.

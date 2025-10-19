@@ -3,10 +3,13 @@ export type DiffChunk = {
   text: string;
 };
 
+export type SuggestionScope = "document" | "selection";
+
 export type LyricOption = {
   label: string;
   lyrics: string;
   diff: DiffChunk[];
+  scope?: SuggestionScope;
 };
 
 export type ChatMessage = {
@@ -18,6 +21,7 @@ export type ChatMessage = {
   createdAt: number;
   status?: "pending" | "complete" | "error";
   error?: string;
+  scope?: SuggestionScope;
 };
 
 export type ChatRequestPayload = {

@@ -22,7 +22,12 @@ def _render_html_from_text(text: str) -> str:
     return "".join(f"<p>{paragraph}</p>" for paragraph in paragraphs)
 
 
-def _normalize_option(index: int, option: dict[str, Any], fallback_html: str) -> dict[str, str]:
+def _normalize_option(
+    index: int,
+    option: dict[str, Any],
+    fallback_html: str,
+    scope: str,
+) -> dict[str, str]:
     label = str(option.get("label") or f"Option {index}")
     lyrics_raw = option.get("lyrics")
     lyrics_text = str(lyrics_raw) if isinstance(lyrics_raw, str) else ""
@@ -33,6 +38,7 @@ def _normalize_option(index: int, option: dict[str, Any], fallback_html: str) ->
         "label": label,
         "lyrics_text": lyrics_text or strip_html(html),
         "lyrics_html": html,
+        "scope": scope,
     }
 
 
@@ -42,6 +48,8 @@ async def generate_suggestion(
 ) -> tuple[list[str], list[dict[str, str]]]:
     system_prompt = prompt_builder.build_system_prompt(prompt.context)
     user_prompt = prompt_builder.build_user_prompt(prompt)
+    scope = "selection" if prompt.context.selection else "document"
+    fallback_source_html = prompt.context.selection or prompt.document_content
 
     if openai_client.is_enabled:
         try:
@@ -52,7 +60,7 @@ async def generate_suggestion(
             )
             commentary, options = _parse_structured_response(structured)
             normalized = [
-                _normalize_option(idx, option, prompt.document_content)
+                _normalize_option(idx, option, fallback_source_html, scope)
                 for idx, option in enumerate(options, start=1)
             ]
             if normalized:
@@ -60,7 +68,7 @@ async def generate_suggestion(
         except Exception as exc:  # noqa: BLE001
             logger.warning("OpenAI request failed, falling back to stub: %s", exc)
 
-    commentary, options = _fallback_suggestion(prompt)
+    commentary, options = _fallback_suggestion(prompt, scope, fallback_source_html)
     return commentary, options
 
 
@@ -96,7 +104,11 @@ def _parse_structured_response(raw_text: str) -> tuple[list[str], list[dict[str,
     return commentary, options
 
 
-def _fallback_suggestion(prompt: PromptInput) -> tuple[list[str], list[dict[str, str]]]:
+def _fallback_suggestion(
+    prompt: PromptInput,
+    scope: str,
+    fallback_source_html: str,
+) -> tuple[list[str], list[dict[str, str]]]:
     message = prompt.user_message.strip()
     commentary_text = message if message else "Consider refining this section."
     suffix = (
@@ -105,10 +117,11 @@ def _fallback_suggestion(prompt: PromptInput) -> tuple[list[str], list[dict[str,
         else "<p><em>Assistant note:</em> Consider refining this section.</p>"
     )
 
-    if suffix in prompt.document_content:
-        lyrics_html = prompt.document_content
+    base_html = fallback_source_html or ""
+    if suffix not in base_html:
+        lyrics_html = base_html + suffix
     else:
-        lyrics_html = prompt.document_content + suffix
+        lyrics_html = base_html
 
     return (
         [commentary_text],
@@ -117,6 +130,7 @@ def _fallback_suggestion(prompt: PromptInput) -> tuple[list[str], list[dict[str,
                 "label": "Option 1",
                 "lyrics_text": strip_html(lyrics_html),
                 "lyrics_html": lyrics_html,
+                "scope": scope,
             }
         ],
     )

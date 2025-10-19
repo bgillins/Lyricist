@@ -1,26 +1,43 @@
 "use client";
 
-import { FormEvent, useCallback, useMemo, useRef, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useChatSession } from "@/features/chat/hooks/useChatSession";
+import type {
+  SelectionPayload,
+  SendMessageOptions,
+} from "@/features/chat/hooks/useChatSession";
 import type { ChatMessage, DiffChunk, LyricOption } from "@/features/chat/types";
 
 export type ChatDockProps = {
   documentId: string;
   getDocumentContent: () => string;
   getDocumentVersionId: () => string | null;
-  getSelection?: () => string | null;
+  prepareSelectionRequest?: () => SelectionRequest | null;
+  incomingSelectionRequest?: SelectionRequest | null;
+  onSelectionRequestConsumed?: () => void;
+  onSelectionRequestSubmitted?: () => void;
+  onSelectionResponseReady?: () => void;
   metadata?: Record<string, string> | null;
-  onPreviewOption?: (content: string) => void;
+  onPreviewOption?: (option: LyricOption) => void;
   isCollapsed?: boolean;
   onExpandCollapse?: () => void;
+};
+
+export type SelectionRequest = {
+  prompt: string;
+  selection: SelectionPayload;
 };
 
 export function ChatDock({
   documentId,
   getDocumentContent,
   getDocumentVersionId,
-  getSelection,
+  prepareSelectionRequest,
+  incomingSelectionRequest,
+  onSelectionRequestConsumed,
+  onSelectionRequestSubmitted,
+  onSelectionResponseReady,
   metadata,
   onPreviewOption,
   isCollapsed = false,
@@ -28,14 +45,55 @@ export function ChatDock({
 }: ChatDockProps) {
   const [draft, setDraft] = useState("");
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const [pendingSelection, setPendingSelection] = useState<SelectionRequest | null>(null);
+  const [helperMessage, setHelperMessage] = useState<string | null>(null);
+  const lastSelectionResponseId = useRef<string | null>(null);
 
   const { messages, isSending, error, sendMessage } = useChatSession({
     documentId,
     getDocumentContent,
     getDocumentVersionId,
-    getSelection,
     metadata,
   });
+
+  useEffect(() => {
+    if (!incomingSelectionRequest) {
+      return;
+    }
+
+    setDraft(incomingSelectionRequest.prompt);
+    setPendingSelection(incomingSelectionRequest);
+    lastSelectionResponseId.current = null;
+    setHelperMessage(null);
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => composerRef.current?.focus());
+    }
+
+    onSelectionRequestConsumed?.();
+  }, [incomingSelectionRequest, onSelectionRequestConsumed]);
+
+  const handleSelectionIntent = useCallback(() => {
+    if (!prepareSelectionRequest) {
+      setHelperMessage("Selection actions are unavailable right now.");
+      return;
+    }
+
+    const request = prepareSelectionRequest();
+    if (!request) {
+      setHelperMessage("Highlight lyrics in the canvas before asking about a selection.");
+      return;
+    }
+
+    setDraft(request.prompt);
+    setPendingSelection(request);
+    lastSelectionResponseId.current = null;
+    setHelperMessage(null);
+
+    if (typeof window !== "undefined") {
+      window.requestAnimationFrame(() => composerRef.current?.focus());
+    }
+  }, [prepareSelectionRequest]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -45,15 +103,57 @@ export function ChatDock({
         return;
       }
       setDraft("");
-      await sendMessage(trimmed);
+      const options: SendMessageOptions = pendingSelection
+        ? {
+            scope: "selection",
+            selection: pendingSelection.selection,
+          }
+        : { scope: "document" };
+
+      const success = await sendMessage(trimmed, options);
+
+      if (pendingSelection) {
+        if (success) {
+          onSelectionRequestSubmitted?.();
+          setPendingSelection(null);
+          setHelperMessage(null);
+        } else {
+          setHelperMessage("Unable to reach the assistant. Try again in a moment.");
+        }
+        lastSelectionResponseId.current = null;
+      } else {
+        setHelperMessage(null);
+      }
+
       if (typeof window !== "undefined") {
         window.requestAnimationFrame(() => composerRef.current?.focus());
       }
     },
-    [draft, isSending, sendMessage],
+    [draft, isSending, onSelectionRequestSubmitted, pendingSelection, sendMessage],
   );
 
   const reversedMessages = useMemo(() => messages.slice().reverse(), [messages]);
+
+  useEffect(() => {
+    if (!onSelectionResponseReady) {
+      return;
+    }
+
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      const message = messages[index];
+      if (
+        message.role === "assistant" &&
+        message.scope === "selection" &&
+        message.status === "complete"
+      ) {
+        if (lastSelectionResponseId.current !== message.id) {
+          lastSelectionResponseId.current = message.id;
+          onSelectionResponseReady();
+        }
+        break;
+      }
+    }
+  }, [messages, onSelectionResponseReady]);
 
   if (isCollapsed) {
     return (
@@ -75,6 +175,16 @@ export function ChatDock({
       <header className="chat-header">
         <h2>GPT Collaborator</h2>
         <p>Describe what you need; we return commentary plus a diff of the revised lyrics.</p>
+        <div className="chat-toolbar">
+          <button
+            type="button"
+            className="chat-highlight-button"
+            onClick={handleSelectionIntent}
+            disabled={isSending}
+          >
+            Highlight → Assistant
+          </button>
+        </div>
       </header>
       <div className="chat-thread" role="log" aria-live="polite">
         {reversedMessages.length === 0 ? (
@@ -107,6 +217,9 @@ export function ChatDock({
             className="chat-textarea"
             disabled={isSending}
           />
+          {pendingSelection ? (
+            <p className="chat-selection-indicator">Next reply will focus on the highlighted lyrics.</p>
+          ) : null}
           <div className="chat-actions">
             <button
               type="submit"
@@ -115,6 +228,7 @@ export function ChatDock({
             >
               {isSending ? "Sending…" : "Send"}
             </button>
+            {helperMessage ? <p className="chat-hint">{helperMessage}</p> : null}
             {error ? <p className="chat-error">{error}</p> : null}
           </div>
         </form>
@@ -128,9 +242,15 @@ function ChatBubble({
   onPreviewOption,
 }: {
   message: ChatMessage;
-  onPreviewOption?: (content: string) => void;
+  onPreviewOption?: (option: LyricOption) => void;
 }) {
   const isAssistant = message.role === "assistant";
+  const scopeLabel: string | null =
+    message.scope === "selection"
+      ? "Selection"
+      : message.scope === "document"
+        ? null
+        : null;
 
   return (
     <article
@@ -142,6 +262,7 @@ function ChatBubble({
         <span className="chat-bubble-role">
           {isAssistant ? "Assistant" : message.role === "user" ? "You" : "System"}
         </span>
+        {scopeLabel ? <span className="chat-bubble-scope">{scopeLabel}</span> : null}
         <time className="chat-bubble-time">
           {new Date(message.createdAt).toLocaleTimeString([], {
             hour: "2-digit",
@@ -202,7 +323,7 @@ function OptionsList({
   onPreviewOption,
 }: {
   options: LyricOption[];
-  onPreviewOption?: (lyrics: string) => void;
+  onPreviewOption?: (option: LyricOption) => void;
 }) {
   return (
     <div className="chat-options">
@@ -215,10 +336,7 @@ function OptionsList({
                 type="button"
                 className="chat-apply-button"
                 onClick={() => {
-                  console.log("🔵 [ChatDock] Preview button clicked");
-                  console.log("🔵 [ChatDock] option.lyrics:", option.lyrics);
-                  console.log("🔵 [ChatDock] option.lyrics length:", option.lyrics?.length);
-                  onPreviewOption(option.lyrics);
+                  onPreviewOption(option);
                 }}
                 disabled={!option.lyrics}
               >

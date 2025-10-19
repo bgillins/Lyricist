@@ -763,6 +763,35 @@ a {
   line-height: 1.5;
 }
 
+.chat-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.chat-highlight-button {
+  padding: 0.35rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--primary-light);
+  background: rgba(62, 106, 226, 0.1);
+  color: var(--primary-dark);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease;
+}
+
+.chat-highlight-button:hover:not(:disabled) {
+  background: rgba(62, 106, 226, 0.18);
+}
+
+.chat-highlight-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .chat-thread {
   flex: 1 1 auto;
   display: flex;
@@ -818,6 +847,16 @@ a {
   text-transform: uppercase;
   color: var(--text-tertiary);
   font-weight: 600;
+}
+
+.chat-bubble-scope {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(62, 106, 226, 0.18);
+  color: var(--primary-dark);
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
 }
 
 .chat-bubble-time {
@@ -1010,6 +1049,17 @@ a {
   box-shadow: none;
 }
 
+.chat-selection-indicator {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.35rem;
+}
+
+.chat-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
 .chat-send-button:not(:disabled):hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-md);
@@ -1049,6 +1099,31 @@ a {
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.selection-request-button {
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--primary-light);
+  background: transparent;
+  color: var(--primary-dark);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+
+.selection-request-button:hover:not(:disabled) {
+  background: rgba(62, 106, 226, 0.12);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.selection-request-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .history-toggle-button {

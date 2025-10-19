@@ -20,8 +20,15 @@ async def post_chat_message(document_id: str, payload: ChatRequest) -> ChatRespo
     # Load existing chat history for this document
     history = chat_history_store.load(document_id)
 
+    scope: str = "selection" if payload.selection else "document"
+
     # Add the user's message to history
-    chat_history_store.add_message(document_id, "user", payload.message)
+    chat_history_store.add_message(
+        document_id,
+        "user",
+        payload.message,
+        context=scope if scope == "selection" else None,
+    )
 
     context = PromptContext(
         document_id=document_id,
@@ -37,7 +44,8 @@ async def post_chat_message(document_id: str, payload: ChatRequest) -> ChatRespo
 
     # Generate suggestion with conversation history
     commentary, options = await generate_suggestion(prompt_input, history.messages)
-    original_text = strip_html(payload.document_content)
+    source_html = payload.selection or payload.document_content
+    original_text = strip_html(source_html)
 
     response_options: list[LyricOption] = []
     for option in options:
@@ -49,6 +57,7 @@ async def post_chat_message(document_id: str, payload: ChatRequest) -> ChatRespo
                 label=option.get("label", "Option"),
                 lyrics=lyrics_html,
                 diff=diff_chunks,
+                scope=scope if scope == "selection" else "document",
             )
         )
 
@@ -56,7 +65,12 @@ async def post_chat_message(document_id: str, payload: ChatRequest) -> ChatRespo
     assistant_content = "\n".join(commentary)
     if response_options:
         assistant_content += f"\n\nProvided {len(response_options)} option(s)"
-    chat_history_store.add_message(document_id, "assistant", assistant_content)
+    chat_history_store.add_message(
+        document_id,
+        "assistant",
+        assistant_content,
+        context=scope if scope == "selection" else None,
+    )
 
     return ChatResponse(commentary=commentary, options=response_options)
 
